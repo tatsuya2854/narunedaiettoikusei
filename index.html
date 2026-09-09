@@ -782,357 +782,514 @@ body{
 </script>
 <script>/* なるねぇ3D */
 /* ============================================================
-   なるねぇ 3D — 元の絵の色と輪郭線をそのまま3Dに起こす
-   ・トゥーンシェーディング＋反転ハルの黒フチ＝原作のフラットな塗り＋太い黒線
-   ・顔はCanvasに描いて球に巻く（表情を差し替えられる）
+   なるねぇ 3D — ソフビフィギュアの質感で作る
+   ・PBR＋環境マップ：プラスチックのテカリと、布のやわらかい光沢
+   ・顔（眉・目・口）は「描いた絵」ではなく、盛り上がった立体パーツ
+   ・ポンポンは花びら状のツヤ素材＋星とキャンディのワッペン
    ・体型／大きさ／服の色は、既存のゲーム状態からそのまま流し込む
    ============================================================ */
 window.Naru3D = (function(){
 "use strict";
 
 var C = {
-  ink:"#141414",        // 輪郭（真っ黒より少し柔らかい）
-  skin:"#F8D0B0",
-  skinD:"#E9B792",
-  hood:"#F8F0D8",
-  hoodD:"#E4D9B8",
-  blush:"#F0A08C",
-  hairA:"#6B3F0A",
-  hairB:"#8A5613",
-  pomA:"#50C8C8",
-  pomB:"#F86090",
-  shoe:"#FFF6E5"
+  ink:"#100C0F",
+  skin:"#FCC79F",
+  hood:"#F2E2BC",
+  hoodIn:"#E2CFA6",
+  hair:"#573109",
+  tongue:"#FF7F97",
+  pomA:"#3FD0CE",
+  pomA2:"#7BE6E0",
+  pomB:"#FF5F91",
+  pomB2:"#FF93B6",
+  shoe:"#FFFFFF",
+  star:"#FFD34E",
+  candy:"#FFB0D2"
 };
 
-/* ---------- トゥーン用の3段グラデーション ---------- */
-function toonRamp(){
-  var c=document.createElement("canvas"); c.width=4; c.height=1;
-  var g=c.getContext("2d");
-  var d=g.createImageData(4,1);
-  // 影 → 中間 → ハイライト（バンドがはっきり出る値にする）
-  var steps=[[128,118,124],[196,188,192],[255,255,255],[255,255,255]];
-  for(var i=0;i<4;i++){ d.data[i*4]=steps[i][0]; d.data[i*4+1]=steps[i][1]; d.data[i*4+2]=steps[i][2]; d.data[i*4+3]=255; }
-  g.putImageData(d,0,0);
-  var t=new THREE.CanvasTexture(c);
-  t.minFilter=THREE.NearestFilter; t.magFilter=THREE.NearestFilter; t.generateMipmaps=false;
-  return t;
+/* ============================================================
+   1. 環境マップ — プラスチックのツヤは映り込みが無いと出ない。
+      スタジオのソフトボックスを1枚の絵にして、それを反射させる。
+   ============================================================ */
+function makeEnv(renderer){
+  var W=256, H=128;
+  var d=new Float32Array(W*H*4);
+  for(var y=0;y<H;y++){
+    var v=y/(H-1);                                  // 0=天井 1=床
+    var base=0.34*(1-v*v)+0.035;                    // 地は暗め＝色が濁らない
+    for(var x=0;x<W;x++){
+      var i=(y*W+x)*4;
+      d[i]=base*1.03; d[i+1]=base*0.95; d[i+2]=base*1.00; d[i+3]=1;
+    }
+  }
+  function box(cx,cy,rx,ry,inten,cr,cg,cb){         // 1.0を超える光＝鋭いハイライト
+    for(var y=0;y<H;y++) for(var x=0;x<W;x++){
+      var dx=(x-cx)/rx, dy=(y-cy)/ry, q=dx*dx+dy*dy;
+      if(q>=1) continue;
+      var f=Math.pow(1-q,2.0)*inten, i=(y*W+x)*4;
+      d[i]+=f*cr; d[i+1]+=f*cg; d[i+2]+=f*cb;
+    }
+  }
+  box( 62, 22, 30, 15, 26.0, 1.00,1.00,1.00);       // キーライト（小さく強く＝鋭い光沢）
+  box(188, 32, 20, 11, 12.0, 1.00,0.95,0.88);       // フィル
+  box(128,  7, 70,  7,  8.0, 1.00,0.99,1.00);       // 天井のライン光
+  box(128,112, 96, 22,  0.9, 1.00,0.82,0.88);       // 床の跳ね返り
+  var t=new THREE.DataTexture(d,W,H,THREE.RGBAFormat,THREE.FloatType);
+  t.mapping=THREE.EquirectangularReflectionMapping;
+  t.needsUpdate=true;
+  var pmrem=new THREE.PMREMGenerator(renderer);
+  pmrem.compileEquirectangularShader();
+  var env=pmrem.fromEquirectangular(t).texture;
+  pmrem.dispose(); t.dispose();
+  return env;
 }
-var RAMP=null;
-function mat(color, map){
-  if(!RAMP) RAMP=toonRamp();
-  var m=new THREE.MeshToonMaterial({color:color, gradientMap:RAMP});
-  if(map){ m.map=map; m.color=new THREE.Color(0xffffff); }
+
+/* ============================================================
+   2. マテリアル
+      clearcoat＝表面のクリア層（ソフビのテカリ）
+      sheen＝布のふわっとした縁の光り方
+   ============================================================ */
+var M={};
+function pbr(o){ return new THREE.MeshPhysicalMaterial(o); }
+function initMats(){
+  if(M.skin) return;
+  M.skin   = pbr({color:C.skin,   roughness:0.50, clearcoat:0.35, clearcoatRoughness:0.55,
+                  sheen:0.18, sheenColor:new THREE.Color("#FF9C86"), sheenRoughness:0.8, envMapIntensity:0.62});
+  M.hood   = pbr({color:C.hood,   roughness:0.70, clearcoat:0.22, clearcoatRoughness:0.60,
+                  sheen:0.22, sheenColor:new THREE.Color("#FFF6E0"), sheenRoughness:0.6, envMapIntensity:0.60});
+  M.hoodIn = pbr({color:C.hoodIn, roughness:0.80, envMapIntensity:0.60});
+  M.hair   = pbr({color:C.hair,   roughness:0.38, clearcoat:0.80, clearcoatRoughness:0.14, envMapIntensity:0.55});
+  M.ink    = pbr({color:C.ink,    roughness:0.30, clearcoat:1.00, clearcoatRoughness:0.06, envMapIntensity:0.30});
+  M.white  = pbr({color:"#FFFFFF",roughness:0.18, clearcoat:0.90, clearcoatRoughness:0.08, envMapIntensity:0.70});
+  M.tongue = pbr({color:C.tongue, roughness:0.30, clearcoat:0.80, clearcoatRoughness:0.12, envMapIntensity:0.65});
+  M.shoe   = pbr({color:C.shoe,   roughness:0.16, clearcoat:1.00, clearcoatRoughness:0.05, envMapIntensity:0.75});
+  M.shirt  = pbr({color:"#F8C020",roughness:0.62, clearcoat:0.16, clearcoatRoughness:0.55,
+                  sheen:0.25, sheenColor:new THREE.Color("#FFE59A"), sheenRoughness:0.55, envMapIntensity:0.62});
+  M.shorts = pbr({color:"#A09898",roughness:0.68, clearcoat:0.14, clearcoatRoughness:0.60,
+                  sheen:0.20, sheenColor:new THREE.Color("#FFFFFF"), sheenRoughness:0.55, envMapIntensity:0.60});
+  M.pomA   = pbr({color:C.pomA,   roughness:0.20, clearcoat:1.0, clearcoatRoughness:0.06, envMapIntensity:0.80});
+  M.pomA2  = pbr({color:C.pomA2,  roughness:0.20, clearcoat:1.0, clearcoatRoughness:0.06, envMapIntensity:0.80});
+  M.pomB   = pbr({color:C.pomB,   roughness:0.20, clearcoat:1.0, clearcoatRoughness:0.06, envMapIntensity:0.80});
+  M.pomB2  = pbr({color:C.pomB2,  roughness:0.20, clearcoat:1.0, clearcoatRoughness:0.06, envMapIntensity:0.80});
+  M.star   = pbr({color:C.star,   roughness:0.18, clearcoat:1.0, clearcoatRoughness:0.06, envMapIntensity:0.85});
+  M.candy  = pbr({color:C.candy,  roughness:0.18, clearcoat:1.0, clearcoatRoughness:0.06, envMapIntensity:0.85});
+  M.floor  = pbr({color:"#E893AE",roughness:0.80, envMapIntensity:0.45});
+  M.wall   = pbr({color:"#F4BFD2",roughness:0.95, envMapIntensity:0.30});
+  M.rug    = pbr({color:"#FFDCE9",roughness:0.90, envMapIntensity:0.45});
+  M.wood   = pbr({color:"#F3C79E",roughness:0.55, clearcoat:0.30, clearcoatRoughness:0.35, envMapIntensity:0.80});
+  M.woodD  = pbr({color:"#E0A778",roughness:0.55, clearcoat:0.30, clearcoatRoughness:0.35, envMapIntensity:0.80});
+  M.glass  = pbr({color:"#CFEFFF",roughness:0.05, clearcoat:1.00, envMapIntensity:1.60});
+  M.jarCap = pbr({color:"#FF9FBE",roughness:0.18, clearcoat:0.90, envMapIntensity:1.20});
+  M.label  = pbr({color:"#FFC6DA",roughness:0.25, clearcoat:0.80, envMapIntensity:1.00});
+}
+function mesh(geo, mat, cast){
+  var m=new THREE.Mesh(geo, mat);
+  m.castShadow = cast!==false;
   return m;
 }
+var tintCache={};
+function pbrTint(hex, rough, cc){
+  var k=hex+"|"+rough+"|"+cc;
+  if(!tintCache[k]) tintCache[k]=pbr({color:hex, roughness:rough==null?0.15:rough,
+    clearcoat:cc==null?1.0:cc, clearcoatRoughness:0.06, envMapIntensity:0.85});
+  return tintCache[k];
+}
 
-/* ---------- 黒フチ（反転ハル）---------- */
-var OUTLINE_MAT=new THREE.MeshBasicMaterial({color:C.ink, side:THREE.BackSide});
-function outlined(geo, material, thickness){
+/* ============================================================
+   3. 顔 — 眉・目・口を立体で作る。
+      球の表面に沿ってチューブを這わせるので、光が当たると
+      本物のフィギュアみたいにフチが光る。
+   ============================================================ */
+var HEAD_R=0.97, FACE_R=HEAD_R+0.008;
+function onSphere(x,y,R){
+  var zz=R*R-x*x-y*y;
+  return new THREE.Vector3(x, y, Math.sqrt(Math.max(0.04, zz)));
+}
+function strokeMesh(pts, rad, mat, R){
+  var vs=pts.map(function(p){ return onSphere(p[0],p[1],R||FACE_R); });
+  var curve=new THREE.CatmullRomCurve3(vs);
   var g=new THREE.Group();
-  var m=new THREE.Mesh(geo, material);
-  m.castShadow=true;
-  g.add(m);
-  var o=new THREE.Mesh(geo, OUTLINE_MAT);
-  var s=1+(thickness||0.06);
-  o.scale.set(s,s,s);
-  g.add(o);
-  g.userData.skin=m;
+  g.add(mesh(new THREE.TubeGeometry(curve, 24, rad, 10, false), mat));
+  [vs[0], vs[vs.length-1]].forEach(function(v){    // 端を丸める
+    var cap=mesh(new THREE.SphereGeometry(rad,10,8), mat);
+    cap.position.copy(v); g.add(cap);
+  });
   return g;
 }
-
-/* ============================================================
-   顔テクスチャ（表情ごとに描き直す）
-   球のUVは u=0.25 が +Z（正面）。そこに顔を描く。
-   ============================================================ */
-var FACE_W=1024, FACE_H=512;
-function drawFace(expr){
-  var c=document.createElement("canvas"); c.width=FACE_W; c.height=FACE_H;
+function tangentAt(x,y,R){
+  // 球面上の点に、表面へ貼り付けるための向きを作る
+  var p=onSphere(x,y,R||FACE_R);
+  var o=new THREE.Object3D();
+  o.position.copy(p);
+  o.lookAt(p.clone().multiplyScalar(2));
+  return o;
+}
+function roundShape(w,h){
+  var s=new THREE.Shape();
+  s.moveTo(-w,h*0.52);
+  s.quadraticCurveTo(0, h*0.98, w, h*0.52);
+  s.bezierCurveTo(w*1.02,-h*0.32, w*0.56,-h, 0,-h);
+  s.bezierCurveTo(-w*0.56,-h, -w*1.02,-h*0.32, -w,h*0.52);
+  return s;
+}
+var _blush=null;
+function blushMat(){
+  if(_blush) return _blush;
+  var c=document.createElement("canvas"); c.width=c.height=128;
   var g=c.getContext("2d");
-
-  // 全体はフードのクリーム色
-  g.fillStyle=C.hood; g.fillRect(0,0,FACE_W,FACE_H);
-
-  // 顔の出ている穴（正面 u=0.25 → x=256）
-  var cx=FACE_W*0.25, cy=FACE_H*0.545;
-  var rx=FACE_W*0.098, ry=FACE_H*0.175;
-
-  g.save();
-  g.beginPath(); g.ellipse(cx,cy,rx,ry,0,0,Math.PI*2);
-  g.fillStyle=C.skin; g.fill();
-  g.lineWidth=FACE_H*0.030; g.strokeStyle=C.ink; g.stroke();
-  g.clip();
-
-  var eyeY=cy-ry*0.10, eyeDX=rx*0.42, lw=FACE_H*0.026;
-  g.strokeStyle=C.ink; g.lineWidth=lw; g.lineCap="round"; g.fillStyle=C.ink;
-
-  function closedEye(x,y,w,h,down){
-    g.beginPath();
-    g.moveTo(x-w,y+(down?-h*0.2:h*0.25));
-    g.quadraticCurveTo(x, y+(down?h*1.3:-h*1.3), x+w, y+(down?-h*0.2:h*0.25));
-    g.stroke();
-  }
-  function openEye(x,y,w,h){
-    g.beginPath(); g.ellipse(x,y,w,h,0,0,Math.PI*2); g.fill();
-    g.fillStyle="#fff"; g.beginPath(); g.ellipse(x-w*0.3,y-h*0.35,w*0.32,h*0.3,0,0,Math.PI*2); g.fill();
-    g.fillStyle=C.ink;
-  }
-  var ew=rx*0.30, eh=ry*0.19;
-
-  if(expr==="sleep"){
-    closedEye(cx-eyeDX,eyeY,ew,eh*0.7,true); closedEye(cx+eyeDX,eyeY,ew,eh*0.7,true);
-  }else if(expr==="wink"){
-    openEye(cx-eyeDX,eyeY,ew*0.5,eh*1.2); closedEye(cx+eyeDX,eyeY,ew,eh,false);
-  }else if(expr==="surprised"){
-    openEye(cx-eyeDX,eyeY,ew*0.46,eh*1.5); openEye(cx+eyeDX,eyeY,ew*0.46,eh*1.5);
-  }else if(expr==="sad"){
-    closedEye(cx-eyeDX,eyeY,ew,eh*0.8,true); closedEye(cx+eyeDX,eyeY,ew,eh*0.8,true);
-  }else{
-    closedEye(cx-eyeDX,eyeY,ew,eh,false); closedEye(cx+eyeDX,eyeY,ew,eh,false);
-  }
-
-  var my=cy+ry*0.42;
-  if(expr==="happy"||expr==="surprised"){
-    g.beginPath(); g.ellipse(cx,my,rx*0.26,ry*0.24,0,0,Math.PI*2);
-    g.fillStyle=C.ink; g.fill();
-    g.beginPath(); g.ellipse(cx,my+ry*0.11,rx*0.16,ry*0.11,0,0,Math.PI*2);
-    g.fillStyle="#FF7C8F"; g.fill();
-  }else if(expr==="sad"){
-    g.beginPath(); g.moveTo(cx-rx*0.16,my+ry*0.06);
-    g.quadraticCurveTo(cx,my-ry*0.10,cx+rx*0.16,my+ry*0.06);
-    g.strokeStyle=C.ink; g.lineWidth=lw*0.85; g.stroke();
-  }else if(expr==="sleep"){
-    g.beginPath(); g.ellipse(cx,my,rx*0.09,ry*0.10,0,0,Math.PI*2);
-    g.fillStyle=C.ink; g.fill();
-  }else{
-    g.beginPath(); g.moveTo(cx-rx*0.20,my-ry*0.06);
-    g.quadraticCurveTo(cx,my+ry*0.20,cx+rx*0.20,my-ry*0.06);
-    g.strokeStyle=C.ink; g.lineWidth=lw*0.85; g.stroke();
-  }
-
-  g.fillStyle=C.blush; g.globalAlpha=0.9;
-  g.beginPath(); g.ellipse(cx-rx*0.66,cy+ry*0.34,rx*0.21,ry*0.15,0,0,Math.PI*2); g.fill();
-  g.beginPath(); g.ellipse(cx+rx*0.66,cy+ry*0.34,rx*0.21,ry*0.15,0,0,Math.PI*2); g.fill();
-  g.globalAlpha=1;
-  g.restore();
-
-  // 前髪：フードの縁からのぞく茶色を、穴の上ぶちにだけ描く
-  g.save();
-  g.beginPath(); g.ellipse(cx,cy,rx*0.99,ry*0.99,0,0,Math.PI*2); g.clip();
-  g.fillStyle=C.hairA;
-  g.beginPath(); g.ellipse(cx,cy-ry*0.94,rx*1.05,ry*0.36,0,0,Math.PI*2); g.fill();
-  g.restore();
-
+  var r=g.createRadialGradient(64,64,4,64,64,62);
+  r.addColorStop(0,   "rgba(255,148,138,0.95)");
+  r.addColorStop(0.55,"rgba(255,148,138,0.52)");
+  r.addColorStop(1,   "rgba(255,148,138,0)");
+  g.fillStyle=r; g.fillRect(0,0,128,128);
   var t=new THREE.CanvasTexture(c);
-  t.anisotropy=4;
-  return t;
+  if(THREE.sRGBEncoding) t.encoding=THREE.sRGBEncoding;
+  _blush=new THREE.MeshBasicMaterial({map:t, transparent:true, depthWrite:false});
+  return _blush;
 }
-var faceCache={};
-function faceTex(expr){
-  if(!faceCache[expr]) faceCache[expr]=drawFace(expr);
-  return faceCache[expr];
+function buildFace(expr){
+  var G=new THREE.Group();
+  var browY=0.335, eyeY=0.070, mouthY=-0.290;
+
+  // --- 眉：内側の端が上がった、得意げな角度 ---
+  if(expr!=="sleep"){
+    var up = (expr==="sad") ? -1 : 1;
+    [-1,1].forEach(function(sx){
+      G.add(strokeMesh([
+        [sx*0.135, browY+up*0.058],
+        [sx*0.285, browY+up*0.020],
+        [sx*0.430, browY-up*0.048]
+      ], 0.056, M.ink));
+    });
+  }
+
+  // --- 目 ---
+  function arc(sx,y,w,h,down){
+    var a=[];
+    for(var i=0;i<=6;i++){
+      var t=i/6;
+      a.push([ sx*0.295 + (t-0.5)*2*w, y + (down?-1:1)*Math.sin(t*Math.PI)*h ]);
+    }
+    return a;
+  }
+  function openEye(sx){
+    var t=tangentAt(sx*0.295, eyeY, FACE_R);
+    var e=mesh(new THREE.SphereGeometry(0.115,20,16), M.ink);
+    e.scale.set(0.80,1.05,0.42); t.add(e);
+    var hi=mesh(new THREE.SphereGeometry(0.040,12,10), M.white);
+    hi.position.set(-sx*0.035,0.042,0.048); hi.scale.set(1,1,0.5); t.add(hi);
+    return t;
+  }
+  if(expr==="wink"){
+    G.add(openEye(-1));
+    G.add(strokeMesh(arc(1, eyeY, 0.145, 0.085, false), 0.056, M.ink));
+  }else if(expr==="surprised"){
+    G.add(openEye(-1)); G.add(openEye(1));
+  }else if(expr==="sleep" || expr==="sad"){
+    [-1,1].forEach(function(sx){ G.add(strokeMesh(arc(sx, eyeY-0.02, 0.140, 0.072, true), 0.048, M.ink)); });
+  }else{
+    [-1,1].forEach(function(sx){ G.add(strokeMesh(arc(sx, eyeY, 0.152, 0.092, false), 0.058, M.ink)); });
+  }
+
+  // --- 口 ---
+  if(expr==="happy" || expr==="surprised"){
+    var mt=tangentAt(0, mouthY, FACE_R-0.004);
+    var mg=new THREE.ExtrudeGeometry(roundShape(0.180,0.148),
+      {depth:0.04, bevelEnabled:true, bevelSize:0.026, bevelThickness:0.030, bevelSegments:5, curveSegments:20});
+    mg.translate(0,0,-0.015);
+    mt.add(mesh(mg, M.ink));
+    var tg=mesh(new THREE.SphereGeometry(0.086,16,12), M.tongue);
+    tg.scale.set(1.05,0.72,0.55); tg.position.set(0,-0.060,0.058); mt.add(tg);
+    G.add(mt);
+  }else if(expr==="sleep"){
+    var st=tangentAt(0, mouthY, FACE_R);
+    var sg=mesh(new THREE.SphereGeometry(0.052,14,12), M.ink);
+    sg.scale.set(1,0.9,0.5); st.add(sg); G.add(st);
+  }else if(expr==="sad"){
+    G.add(strokeMesh([[-0.110,mouthY+0.018],[0,mouthY-0.040],[0.110,mouthY+0.018]], 0.040, M.ink));
+  }else{
+    G.add(strokeMesh([[-0.125,mouthY+0.048],[0,mouthY-0.052],[0.125,mouthY+0.048]], 0.044, M.ink));
+  }
+
+  // --- ほっぺ（やわらかい影なので立体にしない） ---
+  [-1,1].forEach(function(sx){
+    var t=tangentAt(sx*0.495, -0.120, HEAD_R+0.004);
+    var b=mesh(new THREE.PlaneGeometry(0.36,0.26), blushMat(), false);
+    b.position.z=0.002; t.add(b);
+    G.add(t);
+  });
+  return G;
 }
 
 /* ============================================================
-   ポンポン（正二十面体の頂点を散らしてモコモコにする）
+   4. ポンポン — 花びら状のツヤ素材＋星とキャンディのワッペン
    ============================================================ */
-function pomGeo(r){
-  var g=new THREE.IcosahedronGeometry(r,3);
-  var p=g.attributes.position, v=new THREE.Vector3();
-  for(var i=0;i<p.count;i++){
-    v.fromBufferAttribute(p,i);
-    var n=0.86+0.26*Math.abs(Math.sin(v.x*11.0)*Math.cos(v.y*9.5)*Math.sin(v.z*10.2));
-    v.multiplyScalar(n);
-    p.setXYZ(i,v.x,v.y,v.z);
+function starGeo(r){
+  var s=new THREE.Shape(), n=5;
+  for(var i=0;i<n*2;i++){
+    var a=(i/(n*2))*Math.PI*2 - Math.PI/2, rr=(i%2? r*0.46: r);
+    var x=Math.cos(a)*rr, y=Math.sin(a)*rr;
+    if(i===0) s.moveTo(x,y); else s.lineTo(x,y);
   }
-  g.computeVertexNormals();
+  s.closePath();
+  return new THREE.ExtrudeGeometry(s,{depth:0.010,bevelEnabled:true,bevelSize:0.016,bevelThickness:0.014,bevelSegments:3});
+}
+function buildPom(mA, mB){
+  var g=new THREE.Group();
+  var petal=new THREE.SphereGeometry(0.20,12,8);
+  var N=10;
+  for(var ring=0; ring<2; ring++){
+    var rad = ring? 0.15 : 0.25;
+    var hy  = ring? 0.15 : 0.00;
+    for(var i=0;i<N;i++){
+      var a=(i/N)*Math.PI*2 + ring*0.32;
+      var p=mesh(petal, (i%2 ? mA : mB));
+      p.scale.set(0.62, 0.84, 0.50);
+      p.position.set(Math.cos(a)*rad, hy, Math.sin(a)*rad);
+      p.lookAt(new THREE.Vector3(Math.cos(a)*rad*3, hy+(ring?0.9:0.25), Math.sin(a)*rad*3));
+      p.rotateX(Math.PI/2);
+      g.add(p);
+    }
+  }
+  var core=mesh(new THREE.SphereGeometry(0.235,18,14), mA);
+  core.scale.set(1,0.86,1); g.add(core);
+
+  for(var k=0;k<3;k++){
+    var a2=k/3*Math.PI*2+0.6;
+    var st=mesh(starGeo(0.082), M.star);
+    st.position.set(Math.cos(a2)*0.26, 0.20, Math.sin(a2)*0.26);
+    st.lookAt(new THREE.Vector3(Math.cos(a2)*0.9, 0.75, Math.sin(a2)*0.9));
+    g.add(st);
+  }
+  for(var k2=0;k2<2;k2++){
+    var a3=k2/2*Math.PI*2-0.5;
+    var cd=new THREE.Group();
+    var body=mesh(new THREE.SphereGeometry(0.060,12,10), M.candy);
+    body.scale.set(1,0.9,0.9); cd.add(body);
+    [-1,1].forEach(function(s){
+      var w=mesh(new THREE.ConeGeometry(0.050,0.060,8), M.candy);
+      w.rotation.z=s*Math.PI/2; w.position.x=s*0.080; cd.add(w);
+    });
+    cd.position.set(Math.cos(a3)*0.27, -0.05, Math.sin(a3)*0.27);
+    cd.lookAt(new THREE.Vector3(Math.cos(a3)*0.9, -0.12, Math.sin(a3)*0.9));
+    g.add(cd);
+  }
   return g;
 }
 
-
 /* ============================================================
-   アクセサリー（頭に付ける小物を立体で作る）
+   5. アクセサリー
    ============================================================ */
 function buildAcc(id){
+  initMats();
   var g=new THREE.Group();
-  function part(geo,color,th){ var o=outlined(geo,mat(color),th==null?0.10:th); g.add(o); return o; }
+  function part(geo,mat){ var o=mesh(geo,mat); g.add(o); return o; }
   if(id==="ribbon"){
-    var l=part(new THREE.SphereGeometry(0.22,16,12),"#FF5E86"); l.scale.set(1.25,0.85,0.55); l.position.set(-0.22,0,0); l.rotation.z=0.4;
-    var r=part(new THREE.SphereGeometry(0.22,16,12),"#FF5E86"); r.scale.set(1.25,0.85,0.55); r.position.set(0.22,0,0); r.rotation.z=-0.4;
-    part(new THREE.SphereGeometry(0.11,14,10),"#FFC24B",0.14);
-    g.position.set(-0.46,0.80,0.34); g.rotation.set(-0.25,-0.3,0.25); g.scale.setScalar(0.95);
+    var rb=pbrTint("#FF5E86");
+    [-1,1].forEach(function(s){
+      var l=part(new THREE.SphereGeometry(0.22,18,14), rb);
+      l.scale.set(1.25,0.85,0.55); l.position.set(s*0.22,0,0); l.rotation.z=-s*0.4;
+    });
+    part(new THREE.SphereGeometry(0.105,14,12), M.star);
+    g.position.set(-0.52,0.86,0.44); g.rotation.set(-0.25,-0.30,0.25);
   }else if(id==="flower"){
     for(var i=0;i<5;i++){
-      var pe=part(new THREE.SphereGeometry(0.13,14,10),"#FFFFFF",0.16);
-      pe.position.set(Math.cos(i/5*6.283)*0.16, Math.sin(i/5*6.283)*0.16, 0); pe.scale.z=0.5;
+      var pe=part(new THREE.SphereGeometry(0.125,14,12), M.white);
+      pe.position.set(Math.cos(i/5*6.283)*0.155, Math.sin(i/5*6.283)*0.155, 0); pe.scale.z=0.55;
     }
-    var ce=part(new THREE.SphereGeometry(0.09,12,10),"#FFC24B",0.18); ce.position.z=0.03;
-    g.position.set(0.44,0.80,0.36); g.rotation.set(-0.3,0.35,0); g.scale.setScalar(1.0);
+    var ce=part(new THREE.SphereGeometry(0.085,12,10), M.star); ce.position.z=0.04;
+    g.position.set(0.50,0.86,0.44); g.rotation.set(-0.30,0.35,0);
   }else if(id==="band"){
-    var t=part(new THREE.TorusGeometry(0.94,0.10,10,32),"#F0334B",0.07);
-    t.rotation.x=Math.PI/2; t.scale.set(1,1,1.45);
-    var dot=part(new THREE.SphereGeometry(0.12,14,10),"#FFFFFF",0.14); dot.position.set(0,0,0.94); dot.scale.z=0.4;
+    var t=part(new THREE.TorusGeometry(0.95,0.095,12,40), pbrTint("#F0334B",0.22,0.8));
+    t.rotation.x=Math.PI/2; t.scale.set(1,1,1.42);
+    var dot=part(new THREE.SphereGeometry(0.115,14,12), M.white);
+    dot.position.set(0,0,0.94); dot.scale.z=0.45;
     g.position.set(0,0.46,0); g.rotation.x=-0.08;
   }else if(id==="shades"){
-    var bar=part(new THREE.BoxGeometry(0.98,0.06,0.09),"#141414",0.05); bar.position.set(0,0.10,0.72);
-    [-0.24,0.24].forEach(function(x){
-      var lens=part(new THREE.SphereGeometry(0.21,16,12),"#2A2A33",0.08);
-      lens.scale.set(0.95,0.62,0.26); lens.position.set(x,0,0.80);
+    var bar=part(new THREE.BoxGeometry(1.02,0.055,0.085), M.ink); bar.position.set(0,0.13,0.86);
+    [-0.255,0.255].forEach(function(x){
+      var lens=part(new THREE.SphereGeometry(0.215,18,14), pbrTint("#232430",0.06,1.0));
+      lens.scale.set(0.98,0.66,0.26); lens.position.set(x,0.02,0.94);
     });
-    g.position.set(0,0.05,0.04); g.rotation.x=-0.05;
+    g.position.set(0,0.04,0.02); g.rotation.x=-0.05;
   }else if(id==="phones"){
-    var arc=part(new THREE.TorusGeometry(0.96,0.09,10,26,Math.PI),"#8C5BD9",0.08);
-    arc.rotation.z=0; arc.position.y=0.06;
+    var pm=pbrTint("#8C5BD9",0.18,0.9);
+    var arc2=part(new THREE.TorusGeometry(0.97,0.085,12,30,Math.PI), pm); arc2.position.y=0.06;
     [-1,1].forEach(function(sx){
-      var cup=part(new THREE.CylinderGeometry(0.26,0.26,0.20,16),"#8C5BD9",0.08);
+      var cup=part(new THREE.CylinderGeometry(0.26,0.26,0.20,20), pm);
       cup.rotation.z=Math.PI/2; cup.position.set(sx*0.96,0.02,0);
+      var pad=part(new THREE.SphereGeometry(0.20,16,12), M.ink);
+      pad.scale.set(0.5,1,1); pad.position.set(sx*0.86,0.02,0);
     });
     g.position.set(0,0.10,0);
   }else if(id==="crown"){
-    var band=part(new THREE.CylinderGeometry(0.56,0.60,0.20,18,1,true),"#FFB13B",0.07);
+    var gold=pbrTint("#FFC24B",0.10,1.0);
+    var band2=part(new THREE.CylinderGeometry(0.55,0.60,0.20,22,1,true), gold);
+    band2.material.side=THREE.DoubleSide;
     for(var k=0;k<5;k++){
-      var sp=part(new THREE.ConeGeometry(0.15,0.34,10),"#FFC24B",0.10);
-      sp.position.set(Math.cos(k/5*6.283)*0.56,0.24,Math.sin(k/5*6.283)*0.56);
-      var jw=part(new THREE.SphereGeometry(0.065,10,8),k%2?"#2FBFA0":"#FF5E86",0.18);
-      jw.position.set(Math.cos(k/5*6.283)*0.60,0.02,Math.sin(k/5*6.283)*0.60);
+      var a=k/5*6.283;
+      var sp=part(new THREE.ConeGeometry(0.145,0.34,12), gold);
+      sp.position.set(Math.cos(a)*0.56,0.25,Math.sin(a)*0.56);
+      var jw=part(new THREE.SphereGeometry(0.062,12,10), k%2? M.pomA : M.pomB);
+      jw.position.set(Math.cos(a)*0.61,0.02,Math.sin(a)*0.61);
     }
-    g.position.set(0,0.92,0); g.rotation.x=-0.10;
+    g.position.set(0,1.06,0); g.rotation.x=-0.10;
   }else return null;
   return g;
 }
 
 /* ============================================================
-   キャラクター本体を組み立てる
+   6. キャラクター
    ============================================================ */
 function buildNaru(){
+  initMats();
   var root=new THREE.Group();
-
-  // --- 腰（ここを回すと体全体がひねれる） ---
   var hips=new THREE.Group(); hips.position.y=0.52; root.add(hips);
 
   // --- 脚 ---
-  var legGeo=new THREE.CapsuleGeometry(0.195,0.30,4,12);
+  var legGeo=new THREE.CapsuleGeometry(0.195,0.30,6,18);
   var legs=[];
   [-1,1].forEach(function(s){
     var leg=new THREE.Group(); leg.position.set(0.30*s,0,0);
-    var l=outlined(legGeo, mat(C.skin), 0.09); l.position.y=-0.19; leg.add(l);
-    var shoe=outlined(new THREE.SphereGeometry(0.235,20,14), mat(C.shoe), 0.08);
-    shoe.scale.set(1,0.78,1.25); shoe.position.set(0,-0.46,0.05); leg.add(shoe);
+    var l=mesh(legGeo, M.skin); l.position.y=-0.19; leg.add(l);
+    var shoe=mesh(new THREE.SphereGeometry(0.235,22,16), M.shoe);
+    shoe.scale.set(1,0.80,1.25); shoe.position.set(0,-0.46,0.05); leg.add(shoe);
+    var sole=mesh(new THREE.SphereGeometry(0.238,22,16), M.ink);
+    sole.scale.set(0.99,0.32,1.23); sole.position.set(0,-0.565,0.05); leg.add(sole);
     hips.add(leg); legs.push(leg);
   });
 
-  // --- 胴（シャツ）と短パン ---
-  var shirtMat=mat("#F8C020"), shortsMat=mat("#A09898");
+  // --- 胴 ---
   var torso=new THREE.Group(); torso.position.y=0.12; hips.add(torso);
-
-  var shirt=outlined(new THREE.SphereGeometry(0.70,28,20), shirtMat, 0.05);
+  var shirt=mesh(new THREE.SphereGeometry(0.70,36,26), M.shirt);
   shirt.scale.set(1.0,0.90,0.94); shirt.position.y=0.36; torso.add(shirt);
-
-  var shorts=outlined(new THREE.SphereGeometry(0.60,26,18), shortsMat, 0.055);
+  var shorts=mesh(new THREE.SphereGeometry(0.60,32,22), M.shorts);
   shorts.scale.set(1.02,0.66,0.96); shorts.position.y=-0.12; torso.add(shorts);
+  var collar=mesh(new THREE.TorusGeometry(0.30,0.045,10,26), M.shirt);
+  collar.rotation.x=Math.PI/2; collar.position.y=0.70; torso.add(collar);
 
   // --- 腕＋ポンポン ---
-  var armGeo=new THREE.CapsuleGeometry(0.165,0.42,4,12);
+  var armGeo=new THREE.CapsuleGeometry(0.165,0.42,6,18);
   var arms=[], poms=[];
   [-1,1].forEach(function(s,i){
     var arm=new THREE.Group();
     arm.position.set(0.70*s,0.60,0.16);
-    var a=outlined(armGeo, mat(C.skin), 0.10);
-    a.position.y=-0.30; arm.add(a);
-    var pom=outlined(pomGeo(0.40), mat(i===0?C.pomA:C.pomB), 0.05);
-    pom.position.y=-0.74; arm.add(pom);
+    var a=mesh(armGeo, M.skin); a.position.y=-0.30; arm.add(a);
+    var pom=buildPom(i===0?M.pomA:M.pomB, i===0?M.pomA2:M.pomB2);
+    pom.position.y=-0.80; pom.scale.setScalar(1.15); arm.add(pom);
     arm.rotation.z=-s*0.62;
     torso.add(arm); arms.push(arm); poms.push(pom);
   });
 
   // --- 頭 ---
   var head=new THREE.Group(); head.position.y=1.30; torso.add(head);
+  head.add(mesh(new THREE.SphereGeometry(HEAD_R,48,36), M.skin));
 
-  var headMesh=outlined(new THREE.SphereGeometry(0.98,44,32), mat("#ffffff", faceTex("happy")), 0.045);
-  headMesh.scale.set(1,0.96,0.96);
-  head.add(headMesh);
+  // フード：球から正面の丸いフタを外して、顔の穴にする
+  var TH=0.78;
+  var hood=mesh(new THREE.SphereGeometry(HEAD_R+0.035,52,40,0,Math.PI*2,TH,Math.PI-TH), M.hood);
+  hood.material.side=THREE.DoubleSide;
+  hood.rotation.x=Math.PI/2;                       // 開口部を正面（+Z）へ
+  head.add(hood);
 
-  // 耳（左：立ち耳／右：垂れ耳＋ポニーテール）
-  var earL=outlined(new THREE.SphereGeometry(0.30,20,16), mat(C.hood), 0.07);
-  earL.scale.set(0.62,1.55,0.55);
-  earL.position.set(-0.52,0.86,0.06); earL.rotation.z=0.22;
-  head.add(earL);
+  // 穴のフチ＝髪の生え際。ゼロ厚のフチを隠しつつ前髪にもなる
+  var RH=HEAD_R+0.035, rimR=Math.sin(TH)*RH, rimZ=Math.cos(TH)*RH;
+  var rim=mesh(new THREE.TorusGeometry(rimR,0.048,12,52), M.hoodIn);
+  rim.position.z=rimZ; head.add(rim);
+  var bang=mesh(new THREE.SphereGeometry(0.34,20,16), M.hair);
+  bang.scale.set(1.60,0.40,0.42);
+  bang.position.set(0, rimR*0.78, rimZ+0.10); bang.rotation.x=-0.35;
+  head.add(bang);
 
-  var earR=outlined(new THREE.SphereGeometry(0.30,20,16), mat(C.hood), 0.07);
-  earR.scale.set(0.60,1.30,0.55);
-  earR.position.set(0.54,0.80,0.04); earR.rotation.z=-0.30;
-  head.add(earR);
+  var faceSlot=new THREE.Group(); head.add(faceSlot);
 
-  var tail=new THREE.Group(); tail.position.set(0.72,0.44,-0.30); head.add(tail);
-  var tailMesh=outlined(new THREE.SphereGeometry(0.34,22,16), mat(C.hairA), 0.06);
-  tailMesh.scale.set(1.5,0.62,0.72); tailMesh.rotation.z=-0.55; tailMesh.position.set(0.30,0.16,0);
-  tail.add(tailMesh);
-  var tailTip=outlined(new THREE.SphereGeometry(0.22,18,14), mat(C.hairB), 0.07);
-  tailTip.scale.set(1.25,0.6,0.7); tailTip.rotation.z=-1.0; tailTip.position.set(0.62,-0.16,0);
-  tail.add(tailTip);
+  // 耳（ステッチ入り）
+  function ear(sx, h, tilt){
+    var e=new THREE.Group();
+    var cone=mesh(new THREE.ConeGeometry(0.42,h,24), M.hood);
+    cone.scale.z=0.50; e.add(cone);
+    var tip=mesh(new THREE.SphereGeometry(0.062,14,12), M.hood);
+    tip.scale.set(1,0.85,0.50); tip.position.y=h*0.47; e.add(tip);
+    var base=mesh(new THREE.SphereGeometry(0.34,18,14), M.hood);
+    base.scale.set(1.30,0.70,0.56); base.position.y=-h*0.46; e.add(base);
+    var inner=mesh(new THREE.ConeGeometry(0.23,h*0.60,20), M.hoodIn);
+    inner.scale.z=0.30; inner.position.set(0,-h*0.12,0.11); e.add(inner);
+    for(var i=0;i<3;i++){                              // ステッチ
+      var st=mesh(new THREE.CapsuleGeometry(0.016,0.075,4,8), M.hair);
+      st.position.set(-sx*0.12, 0.14-i*0.16, 0.11);
+      st.rotation.z=(i%2?0.75:-0.75); st.rotation.x=-0.26;
+      e.add(st);
+    }
+    e.position.set(sx*0.47, 0.99, -0.03);
+    e.rotation.z=tilt; e.rotation.x=-0.10;
+    return e;
+  }
+  head.add(ear(-1,0.84,0.34));
+  head.add(ear(1,0.74,-0.40));
 
-  root.userData={hips:hips, torso:torso, head:head, headMesh:headMesh, arms:arms, legs:legs,
-                 poms:poms, tail:tail, shirtMat:shirtMat, shortsMat:shortsMat};
+  // ポニーテール
+  var tail=new THREE.Group(); tail.position.set(0.74,0.42,-0.30); head.add(tail);
+  var t1=mesh(new THREE.SphereGeometry(0.34,22,16), M.hair);
+  t1.scale.set(1.5,0.62,0.72); t1.rotation.z=-0.55; t1.position.set(0.30,0.16,0); tail.add(t1);
+  var t2=mesh(new THREE.SphereGeometry(0.22,18,14), M.hair);
+  t2.scale.set(1.25,0.60,0.70); t2.rotation.z=-1.0; t2.position.set(0.62,-0.16,0); tail.add(t2);
+  var hband=mesh(new THREE.TorusGeometry(0.15,0.038,10,20), M.pomB);
+  hband.rotation.y=Math.PI/2; hband.rotation.x=0.4; hband.position.set(0.10,0.14,0); tail.add(hband);
+
+  root.userData={hips:hips, torso:torso, head:head, faceSlot:faceSlot, arms:arms, legs:legs,
+                 poms:poms, tail:tail};
   return root;
 }
 
 /* ============================================================
-   部屋
+   7. 部屋
    ============================================================ */
 function buildRoom(){
+  initMats();
   var room=new THREE.Group();
 
-  var floor=new THREE.Mesh(new THREE.CircleGeometry(9,48), mat("#F2B9CB"));
+  var floor=new THREE.Mesh(new THREE.CircleGeometry(11,56), M.floor);
   floor.rotation.x=-Math.PI/2; floor.receiveShadow=true; room.add(floor);
 
-  var wall=new THREE.Mesh(new THREE.PlaneGeometry(20,12), mat("#FBD9E4"));
-  wall.position.set(0,6,-5.2); wall.receiveShadow=true; room.add(wall);
+  var wall=new THREE.Mesh(new THREE.PlaneGeometry(24,14), M.wall);
+  wall.position.set(0,7,-5.4); room.add(wall);
 
-  // 窓
-  var win=new THREE.Group(); win.position.set(-3.1,3.5,-5.1); room.add(win);
-  var frame=new THREE.Mesh(new THREE.BoxGeometry(2.5,2.5,0.22), mat("#FFFFFF"));
-  win.add(frame);
-  var glass=new THREE.Mesh(new THREE.PlaneGeometry(2.0,2.0), new THREE.MeshBasicMaterial({color:"#CFEFFF"}));
-  glass.position.z=0.13; win.add(glass);
-  [[0,0,0.06,2.05],[0,0,2.05,0.06]].forEach(function(b){
-    var bar=new THREE.Mesh(new THREE.BoxGeometry(b[2],b[3],0.06), new THREE.MeshBasicMaterial({color:"#FFFFFF"}));
-    bar.position.set(0,0,0.16); win.add(bar);
+  var rug=new THREE.Mesh(new THREE.CircleGeometry(3.1,44), M.rug);
+  rug.rotation.x=-Math.PI/2; rug.position.y=0.012; rug.receiveShadow=true; room.add(rug);
+
+  var win=new THREE.Group(); win.position.set(-3.2,3.6,-5.28); room.add(win);
+  win.add(mesh(new THREE.BoxGeometry(2.6,2.6,0.24), M.white, false));
+  var glass=mesh(new THREE.PlaneGeometry(2.05,2.05), M.glass, false); glass.position.z=0.14; win.add(glass);
+  [[0.07,2.1],[2.1,0.07]].forEach(function(b){
+    var bar=mesh(new THREE.BoxGeometry(b[0],b[1],0.07), M.white, false);
+    bar.position.z=0.17; win.add(bar);
   });
 
-  // クローゼット
-  var closet=new THREE.Group(); closet.position.set(-3.5,0,-3.4); closet.rotation.y=0.34; room.add(closet);
-  var body=outlined(new THREE.BoxGeometry(2.2,3.2,1.1), mat("#F4C9A0"), 0.012);
-  body.position.y=1.6; closet.add(body);
-  [-0.55,0.55].forEach(function(x){
-    var d=new THREE.Mesh(new THREE.BoxGeometry(1.0,2.8,0.08), mat("#FFE1C4"));
-    d.position.set(x,1.65,0.57); closet.add(d);
-    var k=new THREE.Mesh(new THREE.SphereGeometry(0.09,12,10), mat(C.ink));
-    k.position.set(x+(x<0?0.38:-0.38),1.6,0.63); closet.add(k);
+  var closet=new THREE.Group(); closet.position.set(-3.6,0,-3.4); closet.rotation.y=0.34; room.add(closet);
+  var body=mesh(new THREE.BoxGeometry(2.3,3.3,1.15), M.wood);
+  body.position.y=1.65; closet.add(body);
+  [-0.57,0.57].forEach(function(x){
+    var d=mesh(new THREE.BoxGeometry(1.02,2.9,0.10), M.woodD);
+    d.position.set(x,1.68,0.60); closet.add(d);
+    var k=mesh(new THREE.SphereGeometry(0.09,14,12), M.ink);
+    k.position.set(x+(x<0?0.39:-0.39),1.62,0.68); closet.add(k);
   });
-  closet.userData.hit=true;
   room.userData={closet:closet};
 
-  // 棚
-  var shelf=new THREE.Group(); shelf.position.set(3.4,1.9,-4.2); shelf.rotation.y=-0.3; room.add(shelf);
-  var plank=outlined(new THREE.BoxGeometry(2.0,0.16,0.7), mat("#E7A98A"), 0.02);
-  shelf.add(plank);
-  var jar=new THREE.Group(); jar.position.y=0.42; shelf.add(jar);
-  var jarB=outlined(new THREE.CylinderGeometry(0.26,0.28,0.62,20), mat("#FFFFFF"), 0.03);
-  jar.add(jarB);
-  var jarC=outlined(new THREE.CylinderGeometry(0.11,0.11,0.26,14), mat("#FFC6DA"), 0.05);
-  jarC.position.y=0.42; jar.add(jarC);
-  var jarL=new THREE.Mesh(new THREE.CylinderGeometry(0.265,0.265,0.26,20), new THREE.MeshBasicMaterial({color:"#FF9FBE"}));
-  jarL.position.y=-0.02; jar.add(jarL);
+  var shelf=new THREE.Group(); shelf.position.set(3.5,1.95,-4.3); shelf.rotation.y=-0.3; room.add(shelf);
+  shelf.add(mesh(new THREE.BoxGeometry(2.1,0.18,0.74), M.wood));
+  var jar=new THREE.Group(); jar.position.y=0.45; shelf.add(jar);
+  jar.add(mesh(new THREE.CylinderGeometry(0.27,0.29,0.66,24), M.white));
+  var cap=mesh(new THREE.CylinderGeometry(0.11,0.11,0.28,16), M.jarCap); cap.position.y=0.45; jar.add(cap);
+  var lbl=mesh(new THREE.CylinderGeometry(0.277,0.277,0.30,24,1,true), M.label);
+  lbl.material.side=THREE.DoubleSide; lbl.position.y=-0.02; jar.add(lbl);
   room.userData.jar=jar;
-
-  // ラグ
-  var rug=new THREE.Mesh(new THREE.CircleGeometry(3.0,40), mat("#FFE3EE"));
-  rug.rotation.x=-Math.PI/2; rug.position.y=0.012; room.add(rug);
 
   return room;
 }
 
 /* ============================================================
-   アニメーション（時間で各パーツの角度を作る＝手付けのモーション）
+   8. モーション（時間から各パーツの角度を作る）
    ============================================================ */
 var ANIM={
   idle:function(u,t,p){
@@ -1176,8 +1333,7 @@ var ANIM={
     p.head.x=-0.2*h;
   },
   clap:function(u,t,p){
-    var b=t*Math.PI*2*2;
-    var c=(Math.sin(b)+1)/2;
+    var b=t*Math.PI*4, c=(Math.sin(b)+1)/2;
     p.armL.z=-0.55-c*0.80; p.armR.z=0.55+c*0.80;
     p.armL.x=-0.55; p.armR.x=-0.55;
     p.body.y=Math.sin(b)*0.03;
@@ -1188,8 +1344,7 @@ var ANIM={
     p.head.z=0.26; p.head.x=0.16;
     p.armL.z=-0.30; p.armR.z=0.30;
     p.armL.x=-0.9; p.armR.x=-0.9;
-    p.body.y=-0.06;
-    p.squash=0.97;
+    p.body.y=-0.06; p.squash=0.97;
   },
   sleep:function(u,t,p){
     var s=Math.sin(t*1.0);
@@ -1213,7 +1368,7 @@ var ANIM={
     p.squash=u<0.12?0.8:(1+0.12*h);
   },
   run:function(u,t,p){
-    var b=t*Math.PI*2*2;
+    var b=t*Math.PI*4;
     p.body.y=Math.abs(Math.sin(b))*0.14;
     p.body.rot=0.34;
     p.legL=Math.sin(b)*0.8; p.legR=-Math.sin(b)*0.8;
@@ -1222,7 +1377,7 @@ var ANIM={
     p.squash=1+Math.sin(b*2)*0.04;
   },
   kiss:function(u,t,p){
-    var w=Math.sin(t*Math.PI*2*0.8);
+    var w=Math.sin(t*Math.PI*1.6);
     p.body.y=0.10+w*0.05;
     p.head.z=w*0.14; p.head.x=-0.12;
     p.armL.z=-0.9; p.armR.z=0.9;
@@ -1249,39 +1404,59 @@ var EXPR={idle:"calm",dance:"happy",cheer:"happy",jump:"happy",clap:"happy",
           run:"happy",kiss:"wink",tilt:"calm"};
 
 /* ============================================================
-   公開API
+   9. 公開API
    ============================================================ */
 function create(canvas, opts){
   opts=opts||{};
-  var renderer=new THREE.WebGLRenderer({canvas:canvas, antialias:true, alpha:true, powerPreference:"low-power"});
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio||1, 2));
-  renderer.shadowMap.enabled=false;
-  renderer.outputEncoding=THREE.sRGBEncoding;
+  var renderer=new THREE.WebGLRenderer({canvas:canvas, antialias:true, alpha:true});
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio||1, 1.75));
+  renderer.shadowMap.enabled=true;
+  renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+  if(THREE.sRGBEncoding) renderer.outputEncoding=THREE.sRGBEncoding;
+  renderer.toneMapping=THREE.NoToneMapping;      // 発色優先。白飛びはHDR環境側で作る
+  renderer.toneMappingExposure=1.0;
 
+  initMats();
   var scene=new THREE.Scene();
-  var camera=new THREE.PerspectiveCamera(34,1,0.1,100);
+  scene.environment=makeEnv(renderer);
+  var camera=new THREE.PerspectiveCamera(32,1,0.1,100);
 
   var room=buildRoom(); scene.add(room);
   var naru=buildNaru(); scene.add(naru);
   var U=naru.userData;
 
-  // 影は「丸影」を1枚敷く（本物の影より軽くて、絵の雰囲気にも合う）
   var blob=new THREE.Mesh(new THREE.CircleGeometry(0.95,32),
-    new THREE.MeshBasicMaterial({color:"#8E4A63", transparent:true, opacity:0.22}));
-  blob.rotation.x=-Math.PI/2; blob.position.y=0.02; scene.add(blob);
+    new THREE.MeshBasicMaterial({color:"#7E3E57", transparent:true, opacity:0.26, depthWrite:false}));
+  blob.rotation.x=-Math.PI/2; blob.position.y=0.025; scene.add(blob);
 
-  scene.add(new THREE.HemisphereLight(0xffffff, 0xE8B9CC, 0.52));
-  var key=new THREE.DirectionalLight(0xffffff, 0.48);
-  key.position.set(3.2,6.5,4.5); scene.add(key);
-  var rim=new THREE.DirectionalLight(0xFFD9EA, 0.14);
-  rim.position.set(-4,3,-3); scene.add(rim);
+  scene.add(new THREE.HemisphereLight(0xFFF0F5, 0xB07E92, 0.05));
+  var key=new THREE.DirectionalLight(0xFFF4E4, 1.45);
+  key.position.set(3.0,7.4,4.2);
+  key.castShadow=true;
+  key.shadow.mapSize.set(1024,1024);
+  key.shadow.camera.near=1; key.shadow.camera.far=24;
+  key.shadow.camera.left=-6; key.shadow.camera.right=6;
+  key.shadow.camera.top=8;   key.shadow.camera.bottom=-2;
+  key.shadow.bias=-0.0016; key.shadow.radius=1.6;
+  scene.add(key);
+  var rim=new THREE.DirectionalLight(0xFFC4DE, 0.30);
+  rim.position.set(-4.5,3.2,-3.5); scene.add(rim);
+  var fill=new THREE.DirectionalLight(0xFFFFFF, 0.12);
+  fill.position.set(-3,1.5,5); scene.add(fill);
 
   var state={
-    act:"idle", actUntil:0, loop:true, actT0:0, dur:1,
-    expr:"calm", spin:0,
+    act:"idle", loop:true, actT0:0, dur:1, expr:"",
     camYaw:0, camYawT:0, camPitch:0, camPitchT:0,
     puni:50, stage:2, beauty:65, mess:0, disco:false, t:0
   };
+
+  function setExpr(e){
+    if(state.expr===e) return;
+    state.expr=e;
+    while(U.faceSlot.children.length) U.faceSlot.remove(U.faceSlot.children[0]);
+    U.faceSlot.add(buildFace(e));
+  }
+  setExpr("calm");
 
   var accNode=null, accId="none";
   function setAcc(id){
@@ -1292,13 +1467,6 @@ function create(canvas, opts){
     if(n){ U.head.add(n); accNode=n; }
   }
 
-  function setExpr(e){
-    if(state.expr===e) return;
-    state.expr=e;
-    U.headMesh.userData.skin.material.map=faceTex(e);
-    U.headMesh.userData.skin.material.needsUpdate=true;
-  }
-
   var api={
     scene:scene, naru:naru, room:room, renderer:renderer, camera:camera, state:state,
 
@@ -1307,41 +1475,29 @@ function create(canvas, opts){
       camera.aspect=w/h; camera.updateProjectionMatrix();
     },
 
-    /* 状態をまるごと反映（ぷに＝体型／stage＝大きさ／beauty＝ツヤ） */
     apply:function(s){
       if(s.puni!=null) state.puni=s.puni;
       if(s.stage!=null) state.stage=s.stage;
       if(s.beauty!=null) state.beauty=s.beauty;
       if(s.mess!=null) state.mess=s.mess;
-      var fat=(state.puni-50)/50;                       // -1..1
-      var w=1+0.34*Math.max(0,fat)-0.13*Math.max(0,-fat);
-      var h=1-0.07*Math.max(0,fat)+0.05*Math.max(0,-fat);
-      U.torso.scale.set(w,h,w);
-      U.head.position.y=1.30*(1/h)*0.99;
-      U.hips.scale.set(1+0.14*Math.max(0,fat),1,1+0.14*Math.max(0,fat));
       var sc=[1,0.66,0.85,1.0,1.10][state.stage!=null?state.stage:2]||1;
       naru.scale.setScalar(sc);
-      blob.scale.setScalar(sc*(1+0.18*Math.max(0,fat)));
-      var glow=Math.max(0,(state.beauty-60)/40);
-      U.shirtMat.emissive=new THREE.Color(0xFFE9A8); U.shirtMat.emissiveIntensity=glow*0.30;
-      var dull=Math.max(0,(35-state.beauty)/35);
-      [U.shirtMat,U.shortsMat].forEach(function(m){
-        m.color.offsetHSL(0,0,0); // 色そのものは触らず、明るさだけ落とす
+      blob.scale.setScalar(sc*0.86*(1+0.18*Math.max(0,(state.puni-50)/50)));
+      // きれい＝ツヤ。上がるとクリア層が澄み、下がると曇る
+      var g=Math.max(0,Math.min(1,(state.beauty-25)/60));
+      [M.skin,M.hood,M.shirt,M.shorts].forEach(function(m){
+        m.clearcoatRoughness=0.72-g*0.42;
+        m.envMapIntensity=0.34+g*0.30;
       });
-      naru.traverse(function(o){
-        if(o.isMesh && o.material && o.material.isMeshToonMaterial){
-          o.material.opacity=1; o.material.transparent=false;
-        }
-      });
-      scene.traverse(function(o){});
-      key.intensity=0.48-dull*0.16;
+      M.shoe.roughness=0.30-g*0.19;
+      key.intensity=1.25+g*0.40;
     },
 
     accessory:function(id){ setAcc(id||"none"); },
 
     outfit:function(shirtHex, shortsHex){
-      U.shirtMat.color.set(shirtHex);
-      U.shortsMat.color.set(shortsHex);
+      M.shirt.color.set(shirtHex);
+      M.shorts.color.set(shortsHex);
     },
 
     play:function(name, seconds){
@@ -1353,15 +1509,15 @@ function create(canvas, opts){
       setExpr(EXPR[name]||"calm");
     },
 
-    look:function(yaw, pitch){    // 指／傾きでカメラを少し回す
-      state.camYawT=Math.max(-0.55,Math.min(0.55,yaw));
-      state.camPitchT=Math.max(-0.20,Math.min(0.28,pitch));
+    look:function(yaw, pitch){
+      state.camYawT=Math.max(-0.6,Math.min(0.6,yaw));
+      state.camPitchT=Math.max(-0.22,Math.min(0.30,pitch));
     },
 
     disco:function(on){
       state.disco=!!on;
       room.visible=!on;
-      scene.background=null;
+      blob.visible=!on;
     },
 
     update:function(dt){
@@ -1380,33 +1536,33 @@ function create(canvas, opts){
       U.arms[0].rotation.z=p.armL.z; U.arms[0].rotation.x=p.armL.x||0;
       U.arms[1].rotation.z=p.armR.z; U.arms[1].rotation.x=p.armR.x||0;
       U.legs[0].rotation.x=p.legL; U.legs[1].rotation.x=p.legR;
+
       var fat=(state.puni-50)/50;
       var w=1+0.34*Math.max(0,fat)-0.13*Math.max(0,-fat);
       var h=1-0.07*Math.max(0,fat)+0.05*Math.max(0,-fat);
       U.torso.scale.set(w/p.squash, h*p.squash, w/p.squash);
+      U.head.position.y=1.30/h;
+      U.hips.scale.set(1+0.14*Math.max(0,fat),1,1+0.14*Math.max(0,fat));
       U.tail.rotation.z=Math.sin(state.t*3.1)*0.22+p.body.rot*0.4;
-      U.poms.forEach(function(pm,i){ pm.rotation.y=state.t*(i?2.2:-2.4); });
+      U.poms.forEach(function(pm,i){ pm.rotation.y=state.t*(i?1.6:-1.8); });
 
-      blob.position.y=0.02;
-      blob.material.opacity=0.22-Math.min(0.14,p.body.y*0.09);
+      blob.material.opacity=0.26-Math.min(0.18,p.body.y*0.11);
 
-      // カメラ：目標へゆっくり寄せる
       state.camYaw+=(state.camYawT-state.camYaw)*Math.min(1,dt*4);
       state.camPitch+=(state.camPitchT-state.camPitch)*Math.min(1,dt*4);
       var sc=naru.scale.x;
-      var needH=3.6*sc, needW=3.1*sc;                 // 全身＋ポンポンが入る大きさ
+      var needH=3.6*sc, needW=3.3*sc;
       var vf=2*Math.tan(camera.fov*Math.PI/360);
       var R=Math.max(needH/0.52/vf, needW/0.82/(vf*Math.max(0.3,camera.aspect)));
       var follow=p.body.y*0.8*sc;
       R*=1+Math.max(0,p.body.y)*0.08;
       camera.position.set(Math.sin(state.camYaw)*R, 2.2+state.camPitch*3.2+sc*0.5+follow, Math.cos(state.camYaw)*R);
-      camera.lookAt(0, 1.95*sc+follow, 0);            // 少し上を見て、キャラを画面の下寄りに置く
+      camera.lookAt(0, 1.95*sc+follow, 0);
 
       renderer.render(scene,camera);
     }
   };
 
-  // 画面をタップした先に何があるか（部屋の小物を押せるようにする）
   var RC=new THREE.Raycaster();
   api.pick=function(nx,ny){
     RC.setFromCamera({x:nx,y:ny}, camera);
@@ -1418,11 +1574,21 @@ function create(canvas, opts){
   };
   api.restAnim="idle";
 
+  // 重い端末向け：解像度を落とし、影を切る（見た目より動きの滑らかさを優先）
+  api.lite=function(){
+    renderer.setPixelRatio(1);
+    renderer.shadowMap.enabled=false;
+    key.castShadow=false;
+    naru.traverse(function(o){ if(o.isMesh) o.castShadow=false; });
+    room.traverse(function(o){ if(o.isMesh) o.castShadow=false; });
+    blob.material.opacity=0.30;
+  };
+
   api.apply({});
   return api;
 }
 
-return {create:create, faceTex:faceTex};
+return {create:create};
 })();
 
 </script>
@@ -1917,6 +2083,7 @@ function applyLook(){
     accEl.style.setProperty("--aw", acc.aw); accEl.style.setProperty("--ax", acc.ax); accEl.style.setProperty("--ay", acc.ay);
   }else{ accEl.innerHTML=""; accEl.removeAttribute("data-id"); }
   $("closetNew").classList.toggle("on", !!S.closetNew);
+  if(G3) G3.accessory(S.acc);
 }
 function accById(id){ for(var i=0;i<ACCS.length;i++) if(ACCS[i].id===id) return ACCS[i]; return ACCS[0]; }
 function outfitById(id){ for(var i=0;i<OUTFITS.length;i++) if(OUTFITS[i].id===id) return OUTFITS[i]; return OUTFITS[0]; }
@@ -2654,6 +2821,8 @@ function sync3D(){
     G3.play(r);
   }
 }
+// 最初の数秒を測って、遅い端末なら自動で軽量モードに落とす
+var q3=0, qT0=0, qN=0, qSum=0;
 function loop3D(ts){
   if(!is3D){ raf3=0; return; }
   raf3=requestAnimationFrame(loop3D);
@@ -2661,6 +2830,16 @@ function loop3D(ts){
   lastT3=ts;
   if(document.hidden) return;
   G3.update(dt);
+  if(q3===0){
+    if(!qT0) qT0=ts;
+    if(ts-qT0 > 700){                        // 立ち上がりは重いので捨てる
+      qN++; qSum+=dt;
+      if(ts-qT0 > 3200 || qN >= 120){
+        if(qN < 4 || qSum/qN > 0.030){ q3=1; G3.lite(); fit3D(); }  // 33fps未満なら軽量へ
+        else q3=2;
+      }
+    }
+  }
 }
 function set3D(on){
   if(on && !can3D()){ toast("この端末では3Dが使えないみたい、、、"); return false; }
@@ -2776,7 +2955,7 @@ window.__naru={ get:function(){ return S; }, set:function(o){ Object.assign(S,o)
   meal:doMeal, move:doMove, look:doLook, poke:pokeNaru, line:lookLine, lines:LINES, act:playAct, pose:setPose, idlePose:idlePose,
   sprite:function(){return spriteEl.getAttribute("data-pose");}, render:render, mess:function(n){ spawnMess(n||1); renderMess(); save(); },
   clean:cleanMess, evolve:function(){ S.careDays=STAGES[Math.min(4,S.stage+1)].days; return checkEvolve(); }, hatch:hatch, egg:tapEgg,
-  dance:startDance, endDance:endDance, danceState:function(){ return D; }, closet:sheetCloset, wear:function(o,a){ if(o) S.outfit=o; if(a) S.acc=a; applyOutfit(); applyLook(); save(); },
+  dance:startDance, endDance:endDance, danceState:function(){ return D; }, closet:sheetCloset, wear:function(o,a){ if(o) S.outfit=o; if(a) S.acc=a; applyOutfit(); render(); save(); },
   unlockAll:function(){ OUTFITS.concat(ACCS).forEach(function(i){ S.unlocked[i.id]=1; }); save(); }, unlocks:checkUnlocks, outfits:OUTFITS, accs:ACCS, stages:STAGES, cache:spriteCache,
   set3D:function(v){ return set3D(v); }, is3D:function(){ return is3D; }, g3:function(){ return G3; }, can3D:can3D };
 
