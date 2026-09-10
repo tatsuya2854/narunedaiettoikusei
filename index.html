@@ -792,8 +792,8 @@ window.Naru3D = (function(){
 "use strict";
 
 var C = {
-  ink:"#100C0F",
-  skin:"#FCC79F",
+  ink:"#241C22",
+  skin:"#FBDCC4",
   hood:"#F2E2BC",
   hoodIn:"#E2CFA6",
   hair:"#573109",
@@ -853,13 +853,15 @@ var M={};
 function pbr(o){ return new THREE.MeshPhysicalMaterial(o); }
 function initMats(){
   if(M.skin) return;
-  M.skin   = pbr({color:C.skin,   roughness:0.50, clearcoat:0.35, clearcoatRoughness:0.55,
-                  sheen:0.18, sheenColor:new THREE.Color("#FF9C86"), sheenRoughness:0.8, envMapIntensity:0.62});
+  // 肌はテカらせない。内側から光が透けるような、やわらかい質感にする
+  M.skin   = pbr({color:C.skin,   roughness:0.66, clearcoat:0.0,
+                  sheen:0.60, sheenColor:new THREE.Color("#FFAE96"), sheenRoughness:0.85, envMapIntensity:0.42});
   M.hood   = pbr({color:C.hood,   roughness:0.70, clearcoat:0.22, clearcoatRoughness:0.60,
                   sheen:0.22, sheenColor:new THREE.Color("#FFF6E0"), sheenRoughness:0.6, envMapIntensity:0.60});
   M.hoodIn = pbr({color:C.hoodIn, roughness:0.80, envMapIntensity:0.60});
   M.hair   = pbr({color:C.hair,   roughness:0.38, clearcoat:0.80, clearcoatRoughness:0.14, envMapIntensity:0.55});
-  M.ink    = pbr({color:C.ink,    roughness:0.30, clearcoat:1.00, clearcoatRoughness:0.06, envMapIntensity:0.30});
+  M.ink    = pbr({color:C.ink,    roughness:0.46, clearcoat:0.28, clearcoatRoughness:0.42, envMapIntensity:0.22});
+  M.hoodLine = pbr({color:"#9B8474", roughness:0.72, clearcoat:0.12, envMapIntensity:0.20});
   M.white  = pbr({color:"#FFFFFF",roughness:0.18, clearcoat:0.90, clearcoatRoughness:0.08, envMapIntensity:0.70});
   M.tongue = pbr({color:C.tongue, roughness:0.30, clearcoat:0.80, clearcoatRoughness:0.12, envMapIntensity:0.65});
   M.shoe   = pbr({color:C.shoe,   roughness:0.16, clearcoat:1.00, clearcoatRoughness:0.05, envMapIntensity:0.75});
@@ -947,74 +949,113 @@ function blushMat(){
   _blush=new THREE.MeshBasicMaterial({map:t, transparent:true, depthWrite:false});
   return _blush;
 }
+// 中央が太く、両端が細くなる線にする。硬い黒い棒ではなく、
+// フェルトを置いたようなやわらかい線に見せるための処理。
+function taperGeo(geo, tubSeg, radSeg, prof){
+  var p=geo.attributes.position, per=radSeg+1;
+  for(var i=0;i<=tubSeg;i++){
+    var cx=0,cy=0,cz=0,j,k;
+    for(j=0;j<per;j++){ k=i*per+j; cx+=p.getX(k); cy+=p.getY(k); cz+=p.getZ(k); }
+    cx/=per; cy/=per; cz/=per;
+    var f=prof(i/tubSeg);
+    for(j=0;j<per;j++){
+      k=i*per+j;
+      p.setXYZ(k, cx+(p.getX(k)-cx)*f, cy+(p.getY(k)-cy)*f, cz+(p.getZ(k)-cz)*f);
+    }
+  }
+  p.needsUpdate=true; geo.computeVertexNormals();
+  return geo;
+}
+function softStroke(pts, rad, mat, R, tipThin){
+  var vs=pts.map(function(q){ return onSphere(q[0],q[1],R||FACE_R); });
+  var curve=new THREE.CatmullRomCurve3(vs);
+  var TS=26, RS=9;
+  var g=new THREE.TubeGeometry(curve, TS, rad, RS, false);
+  var t0=tipThin==null?0.22:tipThin;
+  taperGeo(g, TS, RS, function(t){ return t0+(1-t0)*Math.pow(Math.sin(Math.PI*t),0.62); });
+  return mesh(g, mat);
+}
 function buildFace(expr){
   var G=new THREE.Group();
-  var browY=0.335, eyeY=0.070, mouthY=-0.290;
+  var browY=0.330, eyeY=0.030, mouthY=-0.290;
 
-  // --- 眉：内側の端が上がった、得意げな角度 ---
-  if(expr!=="sleep"){
-    var up = (expr==="sad") ? -1 : 1;
+  // --- 眉：細くてゆるいアーチ。太い斜め線にすると途端に怒り顔になる ---
+  function brows(lift){
     [-1,1].forEach(function(sx){
-      G.add(strokeMesh([
-        [sx*0.135, browY+up*0.058],
-        [sx*0.285, browY+up*0.020],
-        [sx*0.430, browY-up*0.048]
-      ], 0.056, M.ink));
+      G.add(softStroke([
+        [sx*0.150, browY-0.012*lift],
+        [sx*0.300, browY+0.030*lift],
+        [sx*0.455, browY-0.020*lift]
+      ], 0.032, M.ink));
     });
   }
-
-  // --- 目 ---
-  function arc(sx,y,w,h,down){
-    var a=[];
-    for(var i=0;i<=6;i++){
-      var t=i/6;
-      a.push([ sx*0.295 + (t-0.5)*2*w, y + (down?-1:1)*Math.sin(t*Math.PI)*h ]);
-    }
-    return a;
+  // --- 目：浅くて横に長い弧。細めにすると穏やかな寝顔になる ---
+  function eyes(depth, down){
+    [-1,1].forEach(function(sx){
+      var a=[];
+      for(var i=0;i<=6;i++){
+        var t=i/6, x=sx*(0.135+t*0.345);
+        a.push([x, eyeY + (down?-1:1)*Math.sin(t*Math.PI)*depth]);
+      }
+      G.add(softStroke(a, 0.046, M.ink));
+    });
   }
   function openEye(sx){
-    var t=tangentAt(sx*0.295, eyeY, FACE_R);
-    var e=mesh(new THREE.SphereGeometry(0.115,20,16), M.ink);
-    e.scale.set(0.80,1.05,0.42); t.add(e);
-    var hi=mesh(new THREE.SphereGeometry(0.040,12,10), M.white);
-    hi.position.set(-sx*0.035,0.042,0.048); hi.scale.set(1,1,0.5); t.add(hi);
+    var t=tangentAt(sx*0.305, eyeY+0.01, FACE_R);
+    var e=mesh(new THREE.SphereGeometry(0.125,20,16), M.ink);
+    e.scale.set(0.74,1.00,0.34); t.add(e);
+    var hi=mesh(new THREE.SphereGeometry(0.042,12,10), M.white);
+    hi.position.set(-sx*0.038,0.046,0.046); hi.scale.set(1,1,0.5); t.add(hi);
     return t;
   }
+
   if(expr==="wink"){
-    G.add(openEye(-1));
-    G.add(strokeMesh(arc(1, eyeY, 0.145, 0.085, false), 0.056, M.ink));
+    brows(1); G.add(openEye(-1));
+    var a2=[]; for(var i2=0;i2<=6;i2++){ var t2=i2/6; a2.push([0.135+t2*0.345, eyeY+Math.sin(t2*Math.PI)*0.055]); }
+    G.add(softStroke(a2, 0.046, M.ink));
   }else if(expr==="surprised"){
-    G.add(openEye(-1)); G.add(openEye(1));
-  }else if(expr==="sleep" || expr==="sad"){
-    [-1,1].forEach(function(sx){ G.add(strokeMesh(arc(sx, eyeY-0.02, 0.140, 0.072, true), 0.048, M.ink)); });
-  }else{
-    [-1,1].forEach(function(sx){ G.add(strokeMesh(arc(sx, eyeY, 0.152, 0.092, false), 0.058, M.ink)); });
+    brows(1); G.add(openEye(-1)); G.add(openEye(1));
+  }else if(expr==="sleep"){
+    eyes(0.050, true);                       // 眉なし＝いちばん穏やかな顔
+  }else if(expr==="sad"){
+    [-1,1].forEach(function(sx){
+      G.add(softStroke([
+        [sx*0.150, browY+0.030],
+        [sx*0.300, browY-0.005],
+        [sx*0.455, browY-0.045]
+      ], 0.032, M.ink));
+    });
+    eyes(0.045, true);
+  }else if(expr==="happy"){
+    brows(1); eyes(0.075, false);
+  }else{                                     // calm ＝ 参考動画の基本の顔
+    eyes(0.052, false);
   }
 
-  // --- 口 ---
-  if(expr==="happy" || expr==="surprised"){
+  // --- 口：小さいほどかわいい。大きくすると一気に子どもっぽさが消える ---
+  if(expr==="happy"||expr==="surprised"){
     var mt=tangentAt(0, mouthY, FACE_R-0.004);
-    var mg=new THREE.ExtrudeGeometry(roundShape(0.180,0.148),
-      {depth:0.04, bevelEnabled:true, bevelSize:0.026, bevelThickness:0.030, bevelSegments:5, curveSegments:20});
-    mg.translate(0,0,-0.015);
+    var mg=new THREE.ExtrudeGeometry(roundShape(0.125,0.105),
+      {depth:0.03, bevelEnabled:true, bevelSize:0.022, bevelThickness:0.024, bevelSegments:5, curveSegments:18});
+    mg.translate(0,0,-0.012);
     mt.add(mesh(mg, M.ink));
-    var tg=mesh(new THREE.SphereGeometry(0.086,16,12), M.tongue);
-    tg.scale.set(1.05,0.72,0.55); tg.position.set(0,-0.060,0.058); mt.add(tg);
+    var tg=mesh(new THREE.SphereGeometry(0.062,16,12), M.tongue);
+    tg.scale.set(1.05,0.70,0.55); tg.position.set(0,-0.044,0.050); mt.add(tg);
     G.add(mt);
   }else if(expr==="sleep"){
-    var st=tangentAt(0, mouthY, FACE_R);
-    var sg=mesh(new THREE.SphereGeometry(0.052,14,12), M.ink);
-    sg.scale.set(1,0.9,0.5); st.add(sg); G.add(st);
+    // ゆるい波線の口（ω）。参考動画の寝顔がこれ
+    G.add(softStroke([[-0.085,mouthY+0.010],[-0.042,mouthY-0.028],[0,mouthY+0.006],
+                      [0.042,mouthY-0.028],[0.085,mouthY+0.010]], 0.030, M.ink));
   }else if(expr==="sad"){
-    G.add(strokeMesh([[-0.110,mouthY+0.018],[0,mouthY-0.040],[0.110,mouthY+0.018]], 0.040, M.ink));
+    G.add(softStroke([[-0.080,mouthY-0.022],[0,mouthY+0.020],[0.080,mouthY-0.022]], 0.028, M.ink));
   }else{
-    G.add(strokeMesh([[-0.125,mouthY+0.048],[0,mouthY-0.052],[0.125,mouthY+0.048]], 0.044, M.ink));
+    G.add(softStroke([[-0.090,mouthY+0.028],[0,mouthY-0.026],[0.090,mouthY+0.028]], 0.030, M.ink));
   }
 
-  // --- ほっぺ（やわらかい影なので立体にしない） ---
+  // --- ほっぺ：大きく、低く、ふわっと ---
   [-1,1].forEach(function(sx){
-    var t=tangentAt(sx*0.495, -0.120, HEAD_R+0.004);
-    var b=mesh(new THREE.PlaneGeometry(0.36,0.26), blushMat(), false);
+    var t=tangentAt(sx*0.540, -0.205, HEAD_R+0.004);
+    var b=mesh(new THREE.PlaneGeometry(0.46,0.32), blushMat(), false);
     b.position.z=0.002; t.add(b);
     G.add(t);
   });
@@ -1181,51 +1222,50 @@ function buildNaru(){
     torso.add(arm); arms.push(arm); poms.push(pom);
   });
 
-  // --- 頭 ---
-  var head=new THREE.Group(); head.position.y=1.30; torso.add(head);
-  head.add(mesh(new THREE.SphereGeometry(HEAD_R,48,36), M.skin));
+  // --- 頭（参考動画に合わせて、顔の穴を大きく・頭も大きく） ---
+  var head=new THREE.Group(); head.position.y=1.24; head.scale.setScalar(1.13); torso.add(head);
+  head.add(mesh(new THREE.SphereGeometry(HEAD_R,52,40), M.skin));
 
-  // フード：球から正面の丸いフタを外して、顔の穴にする
-  var TH=0.78;
-  var hood=mesh(new THREE.SphereGeometry(HEAD_R+0.035,52,40,0,Math.PI*2,TH,Math.PI-TH), M.hood);
+  var TH=0.88;                                     // 顔の穴の半径（大きいほど幼く見える）
+  var hood=mesh(new THREE.SphereGeometry(HEAD_R+0.038,52,40,0,Math.PI*2,TH,Math.PI-TH), M.hood);
   hood.material.side=THREE.DoubleSide;
-  hood.rotation.x=Math.PI/2;                       // 開口部を正面（+Z）へ
+  hood.rotation.x=Math.PI/2;
   head.add(hood);
 
-  // 穴のフチ＝髪の生え際。ゼロ厚のフチを隠しつつ前髪にもなる
-  var RH=HEAD_R+0.035, rimR=Math.sin(TH)*RH, rimZ=Math.cos(TH)*RH;
-  var rim=mesh(new THREE.TorusGeometry(rimR,0.048,12,52), M.hoodIn);
+  // 穴のフチの内側の暗い当て布。ここがあると顔がくっきり浮き出る
+  var RH=HEAD_R+0.038, rimR=Math.sin(TH)*RH, rimZ=Math.cos(TH)*RH;
+  var rim=mesh(new THREE.TorusGeometry(rimR,0.026,10,56), M.hoodLine);
   rim.position.z=rimZ; head.add(rim);
-  var bang=mesh(new THREE.SphereGeometry(0.34,20,16), M.hair);
-  bang.scale.set(1.60,0.40,0.42);
-  bang.position.set(0, rimR*0.78, rimZ+0.10); bang.rotation.x=-0.35;
-  head.add(bang);
 
   var faceSlot=new THREE.Group(); head.add(faceSlot);
 
   // 耳（ステッチ入り）
-  function ear(sx, h, tilt){
-    var e=new THREE.Group();
-    var cone=mesh(new THREE.ConeGeometry(0.42,h,24), M.hood);
-    cone.scale.z=0.50; e.add(cone);
-    var tip=mesh(new THREE.SphereGeometry(0.062,14,12), M.hood);
-    tip.scale.set(1,0.85,0.50); tip.position.y=h*0.47; e.add(tip);
-    var base=mesh(new THREE.SphereGeometry(0.34,18,14), M.hood);
-    base.scale.set(1.30,0.70,0.56); base.position.y=-h*0.46; e.add(base);
-    var inner=mesh(new THREE.ConeGeometry(0.23,h*0.60,20), M.hoodIn);
-    inner.scale.z=0.30; inner.position.set(0,-h*0.12,0.11); e.add(inner);
+  // 耳：頭の球の表面から、外向きに生やす。
+  // 頭の中心に置くと大半がフードに埋まって、小さな角に見えてしまう。
+  function ear(sx, h, ang){
+    var e=new THREE.Group(), tipR;
+    var cone=mesh(new THREE.ConeGeometry(0.54,h,26), M.hood);
+    cone.scale.z=0.52; e.add(cone);
+    tipR=0.075; var tip=mesh(new THREE.SphereGeometry(tipR,16,12), M.hood);
+    tip.scale.set(1,0.85,0.52); tip.position.y=h*0.41; e.add(tip);
+    var base=mesh(new THREE.SphereGeometry(0.44,18,14), M.hood);
+    base.scale.set(1.10,0.56,0.52); base.position.y=-h*0.40; e.add(base);
+    var inner=mesh(new THREE.ConeGeometry(0.29,h*0.56,20), M.hoodIn);
+    inner.scale.z=0.30; inner.position.set(0,-h*0.10,0.12); e.add(inner);
     for(var i=0;i<3;i++){                              // ステッチ
-      var st=mesh(new THREE.CapsuleGeometry(0.016,0.075,4,8), M.hair);
-      st.position.set(-sx*0.12, 0.14-i*0.16, 0.11);
+      var st=mesh(new THREE.CapsuleGeometry(0.016,0.080,4,8), M.hoodLine);
+      st.position.set(-sx*0.14, 0.10-i*0.13, 0.09);
       st.rotation.z=(i%2?0.75:-0.75); st.rotation.x=-0.26;
       e.add(st);
     }
-    e.position.set(sx*0.47, 0.99, -0.03);
-    e.rotation.z=tilt; e.rotation.x=-0.10;
+    var d=(HEAD_R+0.038) + h*0.40;                     // 表面に立たせる距離
+    e.position.set(sx*Math.sin(ang)*d, Math.cos(ang)*d, -0.03);
+    e.rotation.z=-sx*ang;
+    e.rotation.x=-0.08;
     return e;
   }
-  head.add(ear(-1,0.84,0.34));
-  head.add(ear(1,0.74,-0.40));
+  head.add(ear(-1,0.64,0.72));
+  head.add(ear(1,0.58,0.80));
 
   // ポニーテール
   var tail=new THREE.Group(); tail.position.set(0.74,0.42,-0.30); head.add(tail);
@@ -2856,7 +2896,7 @@ function set3D(on){
   b.classList.toggle("on", is3D);
   if(is3D){
     fit3D(); sync3D(); applyOutfit();
-    G3.play(dancing ? "dance" : (ACT3[curAct] || "idle"));
+    G3.play(dancing ? "dance" : rest3());   // 単発のモーションをループ再生すると飛び続けてしまう
     if(dancing) G3.disco(true);
     lastT3=0;
     if(!raf3) raf3=requestAnimationFrame(loop3D);
