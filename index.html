@@ -259,8 +259,7 @@ body{
    背景の表示位置を切り替える＝パラパラ漫画。画像は1リクエストで済む */
 .body{
   position:relative;width:100%;height:100%;
-  transform-origin:50% 100%;
-  animation:squash 1.6s cubic-bezier(.37,0,.63,1) infinite;
+  transform-origin:50% 100%;              /* 足を床につけたまま沈む */
   transition:filter .9s ease;will-change:transform;
 }
 /* 1枚のシートに「体 / 頭 / ポニーテール」を3段で持たせ、層ごとに別々に動かす。
@@ -288,11 +287,6 @@ body{
 /* 頭とアクセを同じ層に入れて、まとめて揺らす */
 .head-layer{position:absolute;inset:0;z-index:3;will-change:transform;
   transform-origin:var(--hx2,45%) var(--hy2,70%)}
-@keyframes squash{
-  0%,100%{transform:scale(1,1)}
-  34%    {transform:scale(.968,1.036)}
-  68%    {transform:scale(1.034,.97)}
-}
 @keyframes sh{0%,100%{transform:translateX(-50%) scale(1);opacity:.16}
               47%{transform:translateX(-50%) scale(.78);opacity:.08}}
 
@@ -1219,12 +1213,19 @@ function rigLoop(ts){
   var lively = dancing ? 2.6 : (S.energy < 22 ? 0.35 : S.mood < 30 ? 0.6 : 1);
   var amp = lively + rigKick;
   var t = rigT;
+  // 呼吸：足を床につけたまま、幅は変えずに高さだけ縮む。
+  // 生成した連番を実測したら 幅×1.00 / 高さ×0.94 だったので、その値をそのまま使う
+  var per = dancing ? 0.62 : 2.35;
+  var br  = (1 - Math.cos(t * 6.28318 / per)) / 2;          // 0→1→0
+  var d   = 0.060 * (0.75 + 0.25*Math.min(3, amp));
+  bodyEl.style.transform = "scale("+(1+d*0.15*br).toFixed(4)+","+(1-d*br).toFixed(4)+")";
+  // 頭は体の沈みを遅れて追う。ばねなので勝手に「行きすぎて戻る」
   var tr = Math.sin(t*1.75) * 0.85 * amp + Math.sin(t*0.61) * 0.45;
-  var ty = Math.sin(t*2.55 + 0.8) * 1.5 * amp;
+  var ty = br * 3.4 * Math.min(1.8, amp) + Math.sin(t*2.55 + 0.8) * 0.8 * amp;
   var hr = sHeadR.step(tr, dt);
   var hy = sHeadY.step(ty, dt);
   // ポニーテールは頭の“速さ”に引っぱられる（動いた方向と逆に流れる）
-  var pa = sPony.step(-(sHeadR.v*0.052 + sHeadY.v*0.085), dt);
+  var pa = sPony.step(-(sHeadR.v*0.062 + sHeadY.v*0.155), dt);
   pa = Math.max(-14, Math.min(14, pa));
   headL.style.transform  = "translate3d(0,"+hy.toFixed(2)+"px,0) rotate("+hr.toFixed(2)+"deg)";
   spPony.style.transform = "rotate("+pa.toFixed(2)+"deg)";
