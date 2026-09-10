@@ -298,7 +298,18 @@ body{
   background-position:33.333% 0%;
   will-change:transform;
 }
-.sp-pony{z-index:1;transform-origin:var(--px,50%) var(--py,16%)}
+/* コマとコマの間を埋めるため、各層を2枚重ねにする。
+   下＝今のコマ、上＝次のコマ。上の不透明度を 0→1 に動かすと、
+   6fpsのパラパラでも60fpsで溶けるように変わる（枚数を増やさずに滑らかにする） */
+.pony-layer{position:absolute;inset:0;z-index:1;transform-origin:var(--px,50%) var(--py,16%)}
+.sp-pony{z-index:auto}
+.nx{opacity:var(--mix,0)}
+/* 頭は混ぜない。眉や口が二重に見えて「バグ」に見えるため。
+   頭の動きはばねが60fpsで別に付けているので、混ぜなくても止まって見えない。
+   ポニーテールは動きが小さいとき（待機）だけ混ぜる。ダンスのように大きく振れると
+   輪郭がはっきり二重になってしまうので、そのときは切る */
+.sp-head.nx{opacity:0}
+.sp-pony.nx{opacity:var(--mixp,0)}
 .sp-body{z-index:2}
 .sp-head{position:absolute;inset:0}
 /* 表情：フードの内側の「顔の穴」にだけ、別の顔をはめ込む。
@@ -765,10 +776,15 @@ body{
         <div class="av-grow" id="avGrow">
           <div class="aura" aria-hidden="true"></div>
           <div class="body" id="body">
-            <div class="sprite sp-pony" id="spPony" aria-hidden="true"></div>
+            <div class="pony-layer" id="ponyL" aria-hidden="true">
+              <div class="sprite sp-pony" id="spPony"></div>
+              <div class="sprite sp-pony nx" id="spPony2"></div>
+            </div>
             <div class="sprite sp-body" id="spBody" role="img" aria-label="なるねぇ"></div>
+            <div class="sprite sp-body nx" id="spBody2" aria-hidden="true"></div>
             <div class="head-layer" id="headL">
               <div class="sprite sp-head" id="spHead" aria-hidden="true"></div>
+              <div class="sprite sp-head nx" id="spHead2" aria-hidden="true"></div>
               <div class="face" id="spFace" aria-hidden="true"></div>
               <div class="acc" id="acc" aria-hidden="true"></div>
             </div>
@@ -1113,7 +1129,8 @@ var LINES = {
 var $ = function(id){ return document.getElementById(id); };
 var bubble=$("bubble"), wrap=$("avatarWrap"), stage=$("stage"),
     sheet=$("sheet"), sheetInner=$("sheetInner"), toastEl=$("toast"),
-    floatEl=$("avFloat"), growEl=$("avGrow"), bodyEl=$("body"), spriteEl=$("spBody"), spPony=$("spPony"), spHead=$("spHead"), headL=$("headL"), spFace=$("spFace"), accEl=$("acc"), eggEl=$("egg");
+    floatEl=$("avFloat"), growEl=$("avGrow"), bodyEl=$("body"), spriteEl=$("spBody"), spPony=$("spPony"), spHead=$("spHead"), headL=$("headL"), spFace=$("spFace"),
+    spBody2=$("spBody2"), spHead2=$("spHead2"), spPony2=$("spPony2"), ponyL=$("ponyL"), accEl=$("acc"), eggEl=$("egg");
 var REDUCED = !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
 
 /* ============================================================
@@ -1277,17 +1294,18 @@ Spring.prototype.step = function(target, dt){
 /* ---- 連番アニメの再生 ------------------------------------------
    描き起こした連番（待機・ダンス・走る・ジャンプ）を、時間から
    コマ番号を計算して送る。ばねと同じ時計を使うので位相がズレない。 */
-var CYC = { br:{n:8,  per:1.35, loop:1},     // 待機（呼吸）
-            dn:{n:12, per:1.07, loop:1},     // ダンス（2拍で1周）
-            rn:{n:8,  per:0.62, loop:1},     // 走る
-            jp:{n:8,  per:0.90, loop:0} };   // ジャンプ（1回だけ）
+// pony:1 は「ポニーテールもコマ間を混ぜてよい」＝動きが小さい連番
+var CYC = { br:{n:8,  per:1.35, loop:1, pony:1},   // 待機（呼吸）
+            dn:{n:12, per:1.07, loop:1, pony:0},   // ダンス（2拍で1周）
+            rn:{n:8,  per:0.62, loop:1, pony:0},   // 走る
+            jp:{n:8,  per:0.90, loop:0, pony:0} }; // ジャンプ（1回だけ）
 var cycName = null, cycT0 = 0, cycFrame = -1, cycEnd = 0;
 function playCycle(name, dur){
   if(REDUCED || !CYC[name]) return;
   cycName = name; cycT0 = rigT; cycFrame = -1;
   cycEnd = dur ? rigT + dur : 0;
 }
-function stopCycle(){ cycName = null; cycFrame = -1; cycEnd = 0; }
+function stopCycle(){ cycName = null; cycFrame = -1; cycEnd = 0; nextIdx = -1; setMix(0); }
 // 何もしていないときは呼吸ループ。寝ているときは静止ポーズに戻す
 function wantBreathe(){
   if(REDUCED || dancing || actTimer || S.stage === 0) return false;
@@ -1332,13 +1350,19 @@ function rigLoop(ts){
     else if(!c.loop && ph >= 1){ stopCycle(); }
     else{
       playing = true;
-      var fi = c.loop ? (Math.floor(ph * c.n) % c.n) : Math.min(c.n-1, Math.floor(ph * c.n));
+      var fpos = ph * c.n;
+      var fi = c.loop ? (Math.floor(fpos) % c.n) : Math.min(c.n-1, Math.floor(fpos));
+      var fn = c.loop ? ((fi+1) % c.n) : Math.min(c.n-1, fi+1);
+      var ft = fpos - Math.floor(fpos);
       if(fi !== cycFrame){ cycFrame = fi; setPose(cycName + fi, true); }
+      setNext(cycName + fn);
+      setMix(ft*ft*(3-2*ft), c.pony);   // なめらかに立ち上げる（急に混ざらない）
       bodyEl.style.transform = "";      // 動きはコマ側が持っているので二重にかけない
       br = (1 - Math.cos((ph % 1) * 6.28318)) / 2;
     }
   }
   if(!playing){
+    setMix(0);
     var per = dancing ? 0.62 : 2.35;
     br = (1 - Math.cos((t % per) / per * 6.28318)) / 2;
     var d = 0.060 * (0.75 + 0.25*Math.min(3, amp));
@@ -1353,7 +1377,7 @@ function rigLoop(ts){
   var pa = sPony.step(-(sHeadR.v*0.062 + sHeadY.v*0.155), dt);
   pa = Math.max(-14, Math.min(14, pa));
   headL.style.transform  = "translate3d(0,"+hy.toFixed(2)+"px,0) rotate("+hr.toFixed(2)+"deg)";
-  spPony.style.transform = "rotate("+pa.toFixed(2)+"deg)";
+  ponyL.style.transform  = "rotate("+pa.toFixed(2)+"deg)";
   spriteEl.style.transform = "translate3d(0,"+(hy*0.22).toFixed(2)+"px,0) rotate("+(hr*0.3).toFixed(2)+"deg)";
 }
 
@@ -1374,12 +1398,27 @@ function setPose(name, quiet){
     spFace.style.setProperty("--fy", FACEBOX[name][1]+"%");
   }
   paintFace();
-  spPony.style.setProperty("--px",  g[2]+"%"); spPony.style.setProperty("--py",  g[3]+"%");
+  ponyL.style.setProperty("--px",  g[2]+"%"); ponyL.style.setProperty("--py",  g[3]+"%");
   if(changed && !quiet) kickRig(0.35);   // ポーズが切り替わった勢いを髪に伝える
   spriteEl.setAttribute("data-pose", name);
   accEl.style.setProperty("--hx", HEAD[i][0]+"%");
   accEl.style.setProperty("--hy", HEAD[i][1]+"%");
 }
+// 補間用に「次のコマ」を裏で置いておく。表示は --mix で混ぜる
+var nextIdx = -1;
+function setNext(name){
+  var i = POSE[name]; if(i == null || i === nextIdx) return;
+  nextIdx = i;
+  var col = (i%4)*(100/3), row = Math.floor(i/4), U = 100/35;
+  spBody2.style.backgroundPosition = col.toFixed(3)+"% "+(row*U).toFixed(3)+"%";
+  spHead2.style.backgroundPosition = col.toFixed(3)+"% "+((row+12)*U).toFixed(3)+"%";
+  spPony2.style.backgroundPosition = col.toFixed(3)+"% "+((row+24)*U).toFixed(3)+"%";
+}
+function setMix(v, pony){
+  bodyEl.style.setProperty("--mix", v.toFixed(3));
+  bodyEl.style.setProperty("--mixp", (pony ? v : 0).toFixed(3));
+}
+
 // 何もしていないときに表示するポーズ（状態で変わる）
 function idlePose(){
   var h = new Date().getHours();
@@ -1571,6 +1610,7 @@ function applyOutfit(){
   buildOutfit(S.outfit, function(url){
     var u = "url("+url+")";
     spriteEl.style.backgroundImage = u; spHead.style.backgroundImage = u; spPony.style.backgroundImage = u;
+    spBody2.style.backgroundImage  = u; spHead2.style.backgroundImage = u; spPony2.style.backgroundImage = u;
   });
 }
 
