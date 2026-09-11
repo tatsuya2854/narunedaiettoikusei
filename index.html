@@ -339,7 +339,7 @@ body{
 /* たまご */
 .egg{
   position:absolute;left:50%;bottom:0;transform:translateX(-50%);
-  width:150px;height:182px;cursor:pointer;z-index:3;
+  width:118px;height:143px;cursor:pointer;z-index:3;
   transform-origin:50% 95%;
   animation:eggidle 3s ease-in-out infinite;
   display:none;
@@ -1333,7 +1333,7 @@ function drawRig(v, headDeg, headDy, ponyDeg, eCur){
   // 腰を真ん中に置くので、左右で遠いほうの2倍が必要な幅
   var cw = 2*Math.max(bx[2]-m.piv.torso[0], m.piv.torso[0]-bx[0]);
   var CW=G.cv.width, CH=G.cv.height;
-  var k = Math.min(CW/cw, CH/ch);
+  var k = Math.min(CW/cw, CH/ch) * FIT;
   var ox = CW/2 - m.piv.torso[0]*k, oy = CH - bx[3]*k;
   var pos=G.pos, NV=G.NV;
   for(var q=0;q<NV;q++){
@@ -1389,6 +1389,7 @@ function drawRig(v, headDeg, headDy, ponyDeg, eCur){
 }
 // ポーズの数値は元の絵（1254px）の座標系で書いてあるので、そのまま使う
 var RS = 2.2, EX = 2.2;
+var FIT = 0.78;             // 部屋の中での大きさ（家具とのバランスで決めた）
 
 /* ---- ポーズ＝関節の角度 -------------------------------------
    al/ar＝腕、ll/lr＝脚、tr＝胴のひねり、hr＝首、ty/hy＝沈み込み、
@@ -2485,7 +2486,7 @@ window.__naru={ get:function(){ return S; }, set:function(o){ Object.assign(S,o)
   clean:cleanMess, evolve:function(){ S.careDays=STAGES[Math.min(4,S.stage+1)].days; return checkEvolve(); }, hatch:hatch, egg:tapEgg,
   dance:startDance, endDance:endDance, danceState:function(){ return D; }, closet:sheetCloset, wear:function(o,a){ if(o) S.outfit=o; if(a) S.acc=a; applyOutfit(); render(); save(); },
   arm:function(l,r){ POSE.__t={al:l,ar:r}; setPose("__t"); },
-  joint:function(o){ POSE.__t=o; setPose("__t"); }, gl:function(){ return G; },
+  joint:function(o){ POSE.__t=o; setPose("__t"); }, gl:function(){ return G; }, fit:function(v){ FIT=v; },
   unlockAll:function(){ OUTFITS.concat(ACCS).forEach(function(i){ S.unlocked[i.id]=1; }); save(); }, unlocks:checkUnlocks, outfits:OUTFITS, accs:ACCS, stages:STAGES, cache:spriteCache };
 
 })();
