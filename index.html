@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
 <title>なるねぇといっしょ｜笑けるダイエット育成</title>
 <meta name="theme-color" content="#FFD400">
-<link rel="preload" as="image" href="naru.webp?v=9dadb705">
+<link rel="preload" as="image" href="naru.webp?v=acf4009e">
 <link rel="apple-touch-icon" href="icon.png?v=4a07dc6c">
 <link rel="icon" href="icon.png?v=4a07dc6c">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -1179,8 +1179,8 @@ function showTag(text, evo){
    関節でつないで、角度を毎フレーム計算して動かす。
    だから「コマ数」という概念自体がなくなって、どんな速度でも滑らか。
    ============================================================ */
-var ATLAS = {"cw":432.0,"ch":549.45,"aw":1024,"ah":439,"piv":{"head":[182.7,311.4],"pony":[258.3,108.9],"armL":[80.55,351.9],"armR":[277.2,352.35],"legL":[114.3,459.9],"legR":[243.9,459.9],"torso":[179.1,459.45]},"parts":[{"n":"pony","ax":0,"ay":0,"w":193,"h":128,"ox":239.4,"oy":0.0},{"n":"armL","ax":195,"ay":0,"w":83,"h":72,"ox":7.2,"oy":341.55},{"n":"armR","ax":280,"ay":0,"w":86,"h":73,"ox":268.2,"oy":341.55},{"n":"legL","ax":368,"ay":0,"w":85,"h":93,"ox":72.45,"oy":456.3},{"n":"legR","ax":455,"ay":0,"w":85,"h":93,"ox":201.6,"oy":456.3},{"n":"torso","ax":542,"ay":0,"w":224,"h":153,"ox":67.5,"oy":312.3},{"n":"face","ax":0,"ay":155,"w":333,"h":217,"ox":13.05,"oy":109.35},{"n":"hood","ax":335,"ay":155,"w":367,"h":176,"ox":0.0,"oy":40.95},{"n":"blushL","ax":704,"ay":155,"w":54,"h":33,"ox":57.6,"oy":224.1},{"n":"blushR","ax":760,"ay":155,"w":53,"h":32,"ox":250.2,"oy":221.85},{"n":"browL","ax":815,"ay":155,"w":55,"h":19,"ox":98.55,"oy":169.2},{"n":"browR","ax":872,"ay":155,"w":60,"h":27,"ox":205.2,"oy":161.55},{"n":"eyeL","ax":934,"ay":155,"w":58,"h":14,"ox":87.3,"oy":202.95},{"n":"eyeR","ax":0,"ay":374,"w":57,"h":15,"ox":213.75,"oy":200.7},{"n":"mouth","ax":59,"ay":374,"w":80,"h":63,"ox":142.2,"oy":217.35}]};
-var SPRITE_SRC = "naru.webp?v=9dadb705";
+var ATLAS = {"cw":432.0,"ch":549.45,"aw":1024,"ah":439,"piv":{"head":[182.7,311.4],"pony":[258.3,108.9],"torso":[179.1,459.45],"armL":[86.85,350.1],"armR":[270.9,350.55],"legL":[126.0,450.9],"legR":[232.2,450.9]},"parts":[{"n":"pony","ax":0,"ay":0,"w":193,"h":128,"ox":239.4,"oy":0.0},{"n":"armL","ax":195,"ay":0,"w":109,"h":92,"ox":6.3,"oy":322.2},{"n":"armR","ax":306,"ay":0,"w":112,"h":93,"ox":243.0,"oy":322.65},{"n":"legL","ax":420,"ay":0,"w":86,"h":127,"ox":71.55,"oy":423.0},{"n":"legR","ax":508,"ay":0,"w":86,"h":127,"ox":200.7,"oy":423.45},{"n":"torso","ax":596,"ay":0,"w":224,"h":153,"ox":67.5,"oy":312.3},{"n":"face","ax":0,"ay":155,"w":333,"h":217,"ox":13.05,"oy":109.35},{"n":"hood","ax":335,"ay":155,"w":367,"h":176,"ox":0.0,"oy":40.95},{"n":"blushL","ax":704,"ay":155,"w":54,"h":33,"ox":57.6,"oy":224.1},{"n":"blushR","ax":760,"ay":155,"w":53,"h":32,"ox":250.2,"oy":221.85},{"n":"browL","ax":815,"ay":155,"w":55,"h":19,"ox":98.55,"oy":169.2},{"n":"browR","ax":872,"ay":155,"w":60,"h":27,"ox":205.2,"oy":161.55},{"n":"eyeL","ax":934,"ay":155,"w":58,"h":14,"ox":87.3,"oy":202.95},{"n":"eyeR","ax":0,"ay":374,"w":57,"h":15,"ox":213.75,"oy":200.7},{"n":"mouth","ax":59,"ay":374,"w":80,"h":63,"ox":142.2,"oy":217.35}]};
+var SPRITE_SRC = "naru.webp?v=acf4009e";
 
 // パーツのDOM。描画順＝この順（後ろのものほど手前）
 var PART_ORDER = ["pony","legL","legR","armL","armR","torso","face","hood",
@@ -1597,7 +1597,7 @@ function accById(id){ for(var i=0;i<ACCS.length;i++) if(ACCS[i].id===id) return 
 function outfitById(id){ for(var i=0;i<OUTFITS.length;i++) if(OUTFITS[i].id===id) return OUTFITS[i]; return OUTFITS[0]; }
 
 /* --- 服：スプライトの色替え（Canvas）。生成した画像はメモリに置くだけ --- */
-var SPRITE_SRC = "naru.webp?v=9dadb705";
+var SPRITE_SRC = "naru.webp?v=acf4009e";
 var baseImg = null, baseData = null, spriteCache = {cheer:SPRITE_SRC};
 function hsl(r,g,b){
   r/=255;g/=255;b/=255;
@@ -2340,6 +2340,7 @@ window.__naru={ get:function(){ return S; }, set:function(o){ Object.assign(S,o)
   clean:cleanMess, evolve:function(){ S.careDays=STAGES[Math.min(4,S.stage+1)].days; return checkEvolve(); }, hatch:hatch, egg:tapEgg,
   dance:startDance, endDance:endDance, danceState:function(){ return D; }, closet:sheetCloset, wear:function(o,a){ if(o) S.outfit=o; if(a) S.acc=a; applyOutfit(); render(); save(); },
   arm:function(l,r){ POSE.__t={al:l,ar:r}; setPose("__t"); },
+  joint:function(o){ POSE.__t=o; setPose("__t"); },
   unlockAll:function(){ OUTFITS.concat(ACCS).forEach(function(i){ S.unlocked[i.id]=1; }); save(); }, unlocks:checkUnlocks, outfits:OUTFITS, accs:ACCS, stages:STAGES, cache:spriteCache };
 
 })();
