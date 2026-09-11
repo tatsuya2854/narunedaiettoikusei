@@ -102,7 +102,7 @@ body{
 }
 .streak svg{width:13px;height:13px;display:block;color:var(--butter)}
 .streak span.n{font-size:16px;color:var(--ink);letter-spacing:-.01em}
-.age{font-size:9.5px;font-weight:600;color:var(--ink-2);letter-spacing:.04em;white-space:nowrap}
+.age{font-size:9.5px;font-weight:600;color:var(--ink-2);letter-spacing:.04em;white-space:nowrap;border:0;background:rgba(36,31,30,.05);border-radius:999px;padding:4px 10px;cursor:pointer;transition:transform .12s ease}
 
 .gauges{display:flex;gap:14px;margin-top:12px}
 .gauge{flex:1;min-width:0}
@@ -295,6 +295,38 @@ body{
   backdrop-filter:blur(6px);display:none;animation:pop .3s ease;
 }
 .mess-hint.on{display:block}
+
+/* そだてた記録（アルバム） */
+.alb-hero{
+  display:flex;align-items:baseline;gap:6px;flex-wrap:wrap;
+  background:var(--peach-soft);border-radius:var(--r-md);padding:14px 16px;margin:2px 0 12px;
+}
+.alb-hero b{font-family:var(--font-num);font-size:36px;font-weight:800;line-height:1;color:var(--peach)}
+.alb-hero span{font-weight:800;font-size:15px;color:var(--peach)}
+.alb-hero small{width:100%;font-size:11px;color:var(--ink-2);font-weight:600;margin-top:4px}
+.alb-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:8px}
+.alb-cell.wide{margin-bottom:10px}
+.alb-cell.wide b{font-size:17px}
+.alb-cell{background:var(--surface);border-radius:var(--r-sm);padding:10px 12px;box-shadow:var(--sh-1)}
+.alb-cell span{display:block;font-size:10.5px;font-weight:700;color:var(--ink-2);letter-spacing:.04em}
+.alb-cell b{font-family:var(--font-num);font-size:22px;font-weight:800;line-height:1.25}
+.alb-cell em{font-style:normal;font-size:11px;font-weight:700;color:var(--ink-2);margin-left:2px}
+.alb-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.alb-list li{
+  display:flex;align-items:center;gap:9px;
+  background:var(--surface);border-radius:var(--r-sm);padding:9px 12px;box-shadow:var(--sh-1);
+}
+.alb-list i{width:8px;height:8px;border-radius:50%;background:var(--peach);flex:0 0 auto}
+.alb-list li[data-k="grow"] i{background:var(--butter)}
+.alb-list li[data-k="item"] i{background:var(--sky)}
+.alb-list li[data-k="dance"] i{background:#A77BF0}
+.alb-list li[data-k="room"] i{background:var(--mint)}
+.alb-list b{flex:1;font-size:12.5px;font-weight:700;line-height:1.45}
+.alb-list span{font-family:var(--font-num);font-size:10.5px;font-weight:700;color:var(--ink-2);white-space:nowrap}
+.alb-none{font-size:12.5px;font-weight:600;color:var(--ink-2);padding:10px 2px}
+.alb-w{font-family:var(--font-num);font-weight:800;font-size:18px;padding:2px 2px 6px}
+.alb-w em{font-style:normal;color:var(--ink-2);margin:0 6px}
+.alb-w small{font-size:11px;color:var(--ink-2);margin-left:8px}
 
 /* 吹き出し */
 .bubble{
@@ -765,7 +797,7 @@ body{
     <div class="hud-top">
       <div class="brand">なるねぇといっしょ<br><small id="stageChip"><span class="lv">Lv.1</span><span id="stageName">たまご</span></small></div>
       <div class="hud-right">
-        <div class="age" id="age">そだてて 0日</div>
+        <button class="age" id="age" data-act="album">そだてて 0日</button>
       </div>
     </div>
 
@@ -843,7 +875,7 @@ body{
     <!-- ダンス（リズムゲーム） -->
     <div class="dance" id="dance" aria-hidden="true">
       <div class="dance-hud">
-        <div class="sc"><small>SCORE</small><span id="dScore">0</span></div>
+        <div class="sc"><small id="dSong">—</small><span id="dScore">0</span></div>
         <div class="cb" id="dComboWrap"><b id="dCombo">0</b>combo</div>
       </div>
       <div class="dance-prog"><i id="dProg"></i></div>
@@ -914,13 +946,14 @@ var DEF = {
   messAt:Date.now(),  // 散らかりタイマーの基準時刻
   cleanCount:0,
   // --- ダンス ---
-  danceTotal:0, danceBest:0, danceBestRank:"", mute:false,
+  danceTotal:0, danceBest:0, danceBestRank:"", mute:false, danceBestBy:{}, lastSong:"beat",
   // --- クローゼット ---
   outfit:"cheer", acc:"none",
   unlocked:{cheer:1, none:1},
   closetNew:false,
   // --- 実績カウンタ ---
-  moveTotal:0, healthyTotal:0, beautyMax:65, weightStart:null
+  moveTotal:0, healthyTotal:0, beautyMax:65, weightStart:null,
+  mealTotal:0, album:[], albumSeen:{}
 };
 var loaded = store.load();
 var S = Object.assign({}, DEF, loaded || {});
@@ -928,6 +961,14 @@ S.unlocked = Object.assign({}, DEF.unlocked, (loaded && loaded.unlocked) || {});
 if(!Array.isArray(S.mess)) S.mess = [];
 var MIGRATE_V1 = !!(loaded && loaded.stage == null && loaded.visits > 0);
 
+/* そだてた記録。数える以外のことはしない（順位も比較も出さない） */
+function addAlbum(kind, text, once){
+  if(!Array.isArray(S.album)) S.album = [];
+  if(!S.albumSeen) S.albumSeen = {};
+  if(once){ if(S.albumSeen[once]) return; S.albumSeen[once] = 1; }
+  S.album.push({d: todayKey(), k: kind, t: text});
+  if(S.album.length > 120) S.album.splice(0, S.album.length - 120);
+}
 function todayKey(d){
   d = d || new Date();
   var p = function(n){ return n<10 ? "0"+n : ""+n; };
@@ -936,6 +977,7 @@ function todayKey(d){
 function clamp(v,a,b){ return Math.max(a, Math.min(b, v)); }
 function save(){ S.lastTs = Date.now(); store.save(S); }
 function pick(a){ return a[Math.floor(Math.random()*a.length)]; }
+function esc(t){ return String(t).replace(/[&<>"]/g, function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]; }); }
 /* 文字列 → 32bitの種（FNV-1a）。日付を入れると、その日ぶんだけ決まった乱数が出る */
 function seedOf(str){
   var h = 2166136261 >>> 0;
@@ -1047,162 +1089,18 @@ var DAY_X = [3, 9];    // 今日の出来事を置くx（CSSの .dayitem と合�
 /* ============================================================
    3. セリフ
    ============================================================ */
-var LINES = {
-  welcome:[
-    "きたー！！今日も会えたね！\nとりあえず生きてるだけで100点！",
-    "おかえり！\n今日はどっちからいく？食べた話？動いた話？"
-  ],
-  // 久しぶりに開いたときの第一声は、必ず歓迎から入る
-  comeback:function(h){
-    if(h >= 72) return "おかえり！！\n会いたかった〜。\n戻ってきてくれるのが一番うれしい！";
-    if(h >= 24) return "おかえり！\nちょうど今日、会えた。\n今日はなにする？";
+/* セリフは assets/lines.json が唯一の正。build.py がここに埋め込む。
+   JSONを書き換えれば口調がまるごと変わる（コードは触らなくていい）。 */
+var LINES = {"welcome":["きたー！！今日も会えたね！\nとりあえず生きてるだけで100点！","おかえり！\n今日はどっちからいく？食べた話？動いた話？"],"comeback":{"d3":"おかえり！！\n会いたかった〜。\n戻ってきてくれるのが一番うれしい！","d1":"おかえり！\nちょうど今日、会えた。\n今日はなにする？"},"egg":["…………（たまごが ちょっと あったかい）\nタップして あたためてみて！","……コツ……コツ……\n（なにかが 中から たたいてる）","……ピキッ！\nもうちょっと！もうちょっとだよ！","パキパキ……！\nあと少し！！"],"hatch":"はじめまして！！なるねぇだよ〜！\nちっちゃいけど、これから一緒に大きくなろ？","evolve":{"2":"じゃーん！！ちょっと大きくなった！\n毎日会いに来てくれたからだよ、ありがと！","3":"おとななるねぇに進化！！\nもう立派なダイエット仲間だからね？","4":"カ、カリスマなるねぇ……！！\nもはや伝説。ここまで育ててくれて、ほんとにありがとう！"},"meal":{"healthy":["ヘルシー選べたの、普通にすごいよ！\n意志の力じゃなくて習慣の勝ちだね","えらい！でも我慢しすぎは続かないから、\n明日はごほうび入れていいからね"],"normal":["ふつうに食べる。それが一番強い！\n毎日続けられるのが正義だから","記録した時点で勝ち。\nなに食べたか覚えてる人は太りにくいの、マジで"],"reward":["いいねぇ！！おいしかった？\n罪悪感いらないよ、それは燃料！\n……あ、袋そのへんに置かないで？","ごほうび最高！\nはい、じゃあ明日ちょっとだけ動こうね〜？ふふ"]},"move":{"light":["3分でも0分とは全然ちがう！\nこれが積み上がるんだよ〜","軽くでもえらい！体は覚えてるからね"],"solid":["きたー！しっかり動いたね！\n今の顔、ぜったい良い顔してる","ナイス！\n汗かいた日は自分に優しくしていいよ"],"hard":["やりすぎ注意だけど…かっこいい！！\n明日はちゃんと休むこと、約束ね","限界突破！！でもさ、\nダイエットは我慢大会じゃないからね？"]},"dance":{"start":["よっしゃ踊ろ！！\n♪が わ に入った瞬間タップだよ！","音楽かけるね〜！\nリズムに乗るだけで痩せるから！"],"S":["完璧すぎ！！！プロ！？\nこれもう振り付け師じゃん！","Sランク！！\nキレッキレだったよ、汗すごくない？"],"A":["いいねいいね！ほぼ完璧！\n踊ったあとの顔、いちばんかわいいよ","Aランク！\nこの調子で毎日踊ろ？楽しいでしょ？"],"B":["いい汗かいた〜！！\nズレても動いてれば勝ちだから！","Bランク！ぜんぜんいいじゃん！\n踊った時点でもう動いてるからね"],"C":["ふふ、リズム迷子だった？\nでも動いた時点でえらい！！","Cランク！でもね、\n1回目より2回目がうまくなるのが人間だから！"]},"mess":{"some":["あ、床にちょっと落ちてる。\n気が向いたらタップしてみて！","なんか落ちてるね〜。\nひとつ拾うだけでも気持ちいいよ","床のやつ、いつでもいいからね！"],"clean":["ありがと〜！すっきり！","お、いい感じ！","助かる〜"],"allClean":["床、なんにもない！\nこの感じ好きなんだよね〜","わ、ひろい！\nなんか気分までかるくなった"]},"wear":["どう？似合う？？\n服が変わると気分も変わるんだよね〜","きゃー！かわいい！！\nありがと、大事に着るね！","新しい自分、って感じ！\n痩せたら着る服は先に買う派！"],"unlock":"新しいアイテムゲット！\nクローゼットに入れといたよ〜！","look":{"morning":["おはよ〜！\n朝いちの一杯、水がおいしい時間だよ〜","朝ごはん抜くのはナシだよ！\n燃やす体にならないと、動いても意味ないから","顔むくんでる日ある？\n水飲んで首まわすとけっこう戻るよ〜","朝のうちに5分だけ動くと、その日もう勝ち確だから！","今日の予定に「自分の時間」入ってる？\nそこ空けとかないと続かないよ〜"],"noon":["お昼どうする？迷ったら定食！\n丼ものは一瞬で終わるから満足感が足りないんだよね","食後に3分歩くだけで、なんかすごい人になれるよ！","ここまでどう？まだ半分あるよ〜、まだ巻き返せる！","午後の眠気、だいたい炭水化物の量だからね。次から半分にしてみて"],"evening":["夕方の空腹が一番の敵！\nここでナッツかヨーグルト挟むと夜が楽になるよ","今日おつかれ〜！帰ったらまず着替えて。\n部屋着になると人は動かなくなるからね","夜ごはん、あったかいスープから食べてみて。それだけで量減るから","1日座りっぱなしだった人〜？\nはい、今すぐ立って伸びして！"],"night":["夜にがんばりすぎないでね。明日も生きるんだから","お風呂上がりにストレッチだけしとこ？それだけでえらい","今日の自分、何点？\n60点でいいんだよ。100点は続かないから","夜食が食べたい日は、あったかい飲みもの一杯で勝てることある！"],"midnight":["まだ起きてる〜！？\n寝るのもダイエットだからね！？","睡眠足りないと食欲のホルモンが暴れるの。マジで寝よ？","今日はもう閉店！おやすみ〜、また明日ね！"],"moodLow":["なんか元気ない？いいよ、今日はゆっくりで。\n休むのも、ちゃんと続けるうちだからね","うまくいかない日ってあるよ。でも記録だけしとこ？それでいい","ねぇ、ちゃんと自分のこと褒めた？\nここ開いた時点でえらいからね","落ちてる日は決断しないのが正解。\nとりあえず水飲んで寝よ"],"moodHigh":["今日めっちゃ調子いいね！！\nこの勢いのまま明日もいこ〜","ごきげんな日は続くよ。\n楽しいが最強のダイエット法だからね！","その顔いいじゃん！\n痩せる人ってだいたい機嫌いいんだよ"],"tired":["ふぁ〜……ごめん、今日はもう電池ない、、、\n休も？休むのもトレーニングだから","たいりょく残ってないよ！\nここで無理する人がリバウンドするからね","疲れてる日に頑張っても、次の日3日分止まるからね。今日は寝よ"],"beautyHigh":["ねぇ、今日の私キラキラしてない？\n部屋きれいだと肌までツヤ出るんだよ〜","ツヤツヤ〜！\nきれいって、体重より先に変わるとこだから！"],"beautyLow":["……なんか、もっさりしてきた気がする、、、\n部屋片付けて、ちょっと踊ろ？","髪ぼさぼさ、部屋ぐちゃぐちゃ。\nこれ全部つながってるからね〜"],"streak":["{n}日連続だよ！？もはや才能じゃん！","連続記録あるって、それだけで自信になるからね〜","{n}日続いてるってことは、もう習慣になりかけてるってこと！"],"noWeight":["体重は入れても入れなくてもいいからね。\n見たくない日は、見なくていい","数字は敵じゃないよ。ただの今日の天気！\nつけたくなったら、上のとこタップ〜"],"any":["見られてる〜！ちょっと！\nくびれ作ってるとこだから！","ひま？ひまなら一緒にスクワット10回いこ！","今日の自分、ちょっとだけ好きになれてる？\nそれが一番のダイエットだよ","水飲んだ？みんな意外と飲んでないんだよね〜","体重より、階段のぼって息切れするかで見た方がいいよ！","痩せたら着る服、先に買っちゃお？\n買うと動くから、人間って単純！","昨日の自分に勝ってれば勝ち。他人とは比べない！","お腹すいた？それとも口さみしい？\nそこ分けるだけで変わるよ〜","1回の暴食では太らないから安心して！\n太るのは3日続いたときだけ！","姿勢！背中まっすぐにしただけで痩せて見えるからね","今ちょっとだけお腹に力入れてみて。\nはい、それ腹筋！","ダイエットって我慢じゃなくて、\n機嫌よく続けることだからね","明日の自分のためにできること、今日は一個でいいよ","できなかった日は数えなくていい。\nやった日だけ数えよ〜","鏡の前でポーズ取ってみ？\n笑えるし、意外と変わってるから","停滞期？それ体が守りに入ってるだけ。\n2週間は淡々といこ","痩せる順番って、顔→上半身→お腹→下半身。\nお腹が最後じゃないだけマシ！","ちなみに今めっちゃ応援してる。ポンポン持ってるの見える？","クローゼット見た？\n着せ替えできるからね、左のタンス！","上の『そだてて◯日』タップしてみ？\nここまでの記録、全部とってあるよ","ダンス、曲が3つあるからね。\n気分でえらんでいいよ〜"]},"lookSpam":["さっきから見すぎ！！\nその手、スマホじゃなくて水筒持って〜","まだ見てる！？\n恥ずかしいんだけど！！","……ねぇ、ひまでしょ。\nスクワット。10回。今すぐ。"],"poke":["わっ！びっくりした〜！","こら〜！つつくな〜！","ふふ、くすぐったい！\nそのぶん動いてね？","元気だね！その元気、スクワットに使お？","はいはい、かわいいでしょ〜！"],"lowEnergy":["ちょっと待って、休も？\n寝不足のダイエットは太るってデータあるからね"],"overCap":["今日はもう十分！\n記録しすぎもよくないから、また明日ね〜"],"shape":{"chubby":"ちょっと！ぷにぷにしてきた！\nでも大丈夫、ここからが本番だから","soft":"ふっくら期。かわいいけどね、\nそろそろ動こっか！","natural":"いい感じ！このへんキープ！\n体重より見た目と体調だよ〜","fit":"しゅっとしてきた！！\n服が軽くなったでしょ？","toomuch":"…ねぇ、ちょっと痩せすぎ。\nちゃんと食べて。心配なんだけど"}};
+// 久しぶりに開いたときの第一声は、必ず歓迎から入る
+LINES.comeback = (function(c){
+  return function(h){
+    if(h >= 72) return c.d3;
+    if(h >= 24) return c.d1;
     return "";
-  },
-  egg:[
-    "…………（たまごが ちょっと あったかい）\nタップして あたためてみて！",
-    "……コツ……コツ……\n（なにかが 中から たたいてる）",
-    "……ピキッ！\nもうちょっと！もうちょっとだよ！",
-    "パキパキ……！\nあと少し！！"
-  ],
-  hatch:"はじめまして！！なるねぇだよ〜！\nちっちゃいけど、これから一緒に大きくなろ？",
-  evolve:{
-    2:"じゃーん！！ちょっと大きくなった！\n毎日会いに来てくれたからだよ、ありがと！",
-    3:"おとななるねぇに進化！！\nもう立派なダイエット仲間だからね？",
-    4:"カ、カリスマなるねぇ……！！\nもはや伝説。ここまで育ててくれて、ほんとにありがとう！"
-  },
-  meal:{
-    healthy:["ヘルシー選べたの、普通にすごいよ！\n意志の力じゃなくて習慣の勝ちだね","えらい！でも我慢しすぎは続かないから、\n明日はごほうび入れていいからね"],
-    normal:["ふつうに食べる。それが一番強い！\n毎日続けられるのが正義だから","記録した時点で勝ち。\nなに食べたか覚えてる人は太りにくいの、マジで"],
-    reward:["いいねぇ！！おいしかった？\n罪悪感いらないよ、それは燃料！\n……あ、袋そのへんに置かないで？","ごほうび最高！\nはい、じゃあ明日ちょっとだけ動こうね〜？ふふ"]
-  },
-  move:{
-    light:["3分でも0分とは全然ちがう！\nこれが積み上がるんだよ〜","軽くでもえらい！体は覚えてるからね"],
-    solid:["きたー！しっかり動いたね！\n今の顔、ぜったい良い顔してる","ナイス！\n汗かいた日は自分に優しくしていいよ"],
-    hard:["やりすぎ注意だけど…かっこいい！！\n明日はちゃんと休むこと、約束ね","限界突破！！でもさ、\nダイエットは我慢大会じゃないからね？"]
-  },
-  dance:{
-    start:["よっしゃ踊ろ！！\n♪が わ に入った瞬間タップだよ！","音楽かけるね〜！\nリズムに乗るだけで痩せるから！"],
-    S:["完璧すぎ！！！プロ！？\nこれもう振り付け師じゃん！","Sランク！！\nキレッキレだったよ、汗すごくない？"],
-    A:["いいねいいね！ほぼ完璧！\n踊ったあとの顔、いちばんかわいいよ","Aランク！\nこの調子で毎日踊ろ？楽しいでしょ？"],
-    B:["いい汗かいた〜！！\nズレても動いてれば勝ちだから！","Bランク！全然いいよ！\n最初はみんなそんなもん！"],
-    C:["ふふ、リズム迷子だった？\nでも動いた時点でえらい！！","Cランク！でもね、\n1回目より2回目がうまくなるのが人間だから！"]
-  },
-  mess:{
-    // 責めない・急かさない。気づいたら気持ちよかった、くらいの温度にする
-    some:["あ、床にちょっと落ちてる。\n気が向いたらタップしてみて！","なんか落ちてるね〜。\nひとつ拾うだけでも気持ちいいよ","床のやつ、いつでもいいからね！"],
-    clean:["ありがと〜！すっきり！","お、いい感じ！","助かる〜"],
-    allClean:["床、なんにもない！\nこの感じ好きなんだよね〜","わ、ひろい！\nなんか気分までかるくなった"]
-  },
-  wear:["どう？似合う？？\n服が変わると気分も変わるんだよね〜","きゃー！かわいい！！\nありがと、大事に着るね！","新しい自分、って感じ！\n痩せたら着る服は先に買う派！"],
-  unlock:"新しいアイテムゲット！\nクローゼットに入れといたよ〜！",
-  look:{
-    morning:[
-      "おはよ〜！朝いちの体重が一番かわいい数字だからね、\n今のうちに見とこ！",
-      "朝ごはん抜くのはナシだよ！\n燃やす体にならないと、動いても意味ないから",
-      "顔むくんでる日ある？\n水飲んで首まわすとけっこう戻るよ〜",
-      "朝のうちに5分だけ動くと、その日もう勝ち確だから！",
-      "今日の予定に「自分の時間」入ってる？\nそこ空けとかないと続かないよ〜"
-    ],
-    noon:[
-      "お昼どうする？迷ったら定食！\n丼ものは一瞬で終わるから満足感が足りないんだよね",
-      "食後に3分歩くだけで、なんかすごい人になれるよ！",
-      "ここまでどう？まだ半分あるよ〜、まだ巻き返せる！",
-      "午後の眠気、だいたい炭水化物の量だからね。次から半分にしてみて"
-    ],
-    evening:[
-      "夕方の空腹が一番の敵！\nここでナッツかヨーグルト挟むと夜が楽になるよ",
-      "今日おつかれ〜！帰ったらまず着替えて。\n部屋着になると人は動かなくなるからね",
-      "夜ごはん、あったかいスープから食べてみて。それだけで量減るから",
-      "1日座りっぱなしだった人〜？\nはい、今すぐ立って伸びして！"
-    ],
-    night:[
-      "夜にがんばりすぎないでね。明日も生きるんだから",
-      "お風呂上がりにストレッチだけしとこ？それだけでえらい",
-      "今日の自分、何点？\n60点でいいんだよ。100点は続かないから",
-      "夜食が食べたい日は、あったかい飲みもの一杯で勝てることある！"
-    ],
-    midnight:[
-      "まだ起きてる〜！？\n寝るのもダイエットだからね！？",
-      "睡眠足りないと食欲のホルモンが暴れるの。マジで寝よ？",
-      "今日はもう閉店！おやすみ〜、また明日ね！"
-    ],
-    moodLow:[
-      "なんか元気ない？いいよ、今日はゆっくりで。\n休むのも、ちゃんと続けるうちだからね",
-      "うまくいかない日ってあるよ。でも記録だけしとこ？それでいい",
-      "ねぇ、ちゃんと自分のこと褒めた？\nここ開いた時点でえらいからね",
-      "落ちてる日は決断しないのが正解。\nとりあえず水飲んで寝よ"
-    ],
-    moodHigh:[
-      "今日めっちゃ調子いいね！！\nこの勢いのまま明日もいこ〜",
-      "ごきげんな日は続くよ。\n楽しいが最強のダイエット法だからね！",
-      "その顔いいじゃん！\n痩せる人ってだいたい機嫌いいんだよ"
-    ],
-    tired:[
-      "ふぁ〜……ごめん、今日はもう電池ない、、、\n休も？休むのもトレーニングだから",
-      "たいりょく残ってないよ！\nここで無理する人がリバウンドするからね",
-      "疲れてる日に頑張っても、次の日3日分止まるからね。今日は寝よ"
-    ],
-    beautyHigh:[
-      "ねぇ、今日の私キラキラしてない？\n部屋きれいだと肌までツヤ出るんだよ〜",
-      "ツヤツヤ〜！\nきれいって、体重より先に変わるとこだから！"
-    ],
-    beautyLow:[
-      "……なんか、もっさりしてきた気がする、、、\n部屋片付けて、ちょっと踊ろ？",
-      "髪ぼさぼさ、部屋ぐちゃぐちゃ。\nこれ全部つながってるからね〜"
-    ],
-    streak:[
-      "{n}日連続だよ！？もはや才能じゃん！",
-      "連続記録あるって、それだけで自信になるからね〜",
-      "{n}日続いてるってことは、もう習慣になりかけてるってこと！"
-    ],
-    noWeight:[
-      "体重まだ入れてないよね？\n見るのが怖い日ほど、記録すると軽くなるよ〜",
-      "数字は敵じゃないよ。ただの今日の天気！\nはい、上のとこタップ〜"
-    ],
-    any:[
-      "見られてる〜！ちょっと！\nくびれ作ってるとこだから！",
-      "ひま？ひまなら一緒にスクワット10回いこ！",
-      "今日の自分、ちょっとだけ好きになれてる？\nそれが一番のダイエットだよ",
-      "水飲んだ？みんな意外と飲んでないんだよね〜",
-      "体重より、階段のぼって息切れするかで見た方がいいよ！",
-      "痩せたら着る服、先に買っちゃお？\n買うと動くから、人間って単純！",
-      "昨日の自分に勝ってれば勝ち。他人とは比べない！",
-      "お腹すいた？それとも口さみしい？\nそこ分けるだけで変わるよ〜",
-      "1回の暴食では太らないから安心して！\n太るのは3日続いたときだけ！",
-      "姿勢！背中まっすぐにしただけで痩せて見えるからね",
-      "今ちょっとだけお腹に力入れてみて。\nはい、それ腹筋！",
-      "ダイエットって我慢じゃなくて、\n機嫌よく続けることだからね",
-      "明日の自分のためにできること、今日は一個でいいよ",
-      "できなかった日は数えなくていい。\nやった日だけ数えよ〜",
-      "鏡の前でポーズ取ってみ？\n笑えるし、意外と変わってるから",
-      "停滞期？それ体が守りに入ってるだけ。\n2週間は淡々といこ",
-      "痩せる順番って、顔→上半身→お腹→下半身。\nお腹が最後じゃないだけマシ！",
-      "ちなみに今めっちゃ応援してる。ポンポン持ってるの見える？",
-      "クローゼット見た？\n着せ替えできるからね、左のタンス！"
-    ]
-  },
-  lookSpam:[
-    "さっきから見すぎ！！\nその手、スマホじゃなくて水筒持って〜",
-    "まだ見てる！？\n恥ずかしいんだけど！！",
-    "……ねぇ、ひまでしょ。\nスクワット。10回。今すぐ。"
-  ],
-  poke:[
-    "わっ！びっくりした〜！",
-    "こら〜！つつくな〜！",
-    "ふふ、くすぐったい！\nそのぶん動いてね？",
-    "元気だね！その元気、スクワットに使お？",
-    "はいはい、かわいいでしょ〜！"
-  ],
-  lowEnergy:["ちょっと待って、休も？\n寝不足のダイエットは太るってデータあるからね"],
-  overCap:["今日はもう十分！\n記録しすぎもよくないから、また明日ね〜"],
-  shape:{
-    chubby:"ちょっと！ぷにぷにしてきた！\nでも大丈夫、ここからが本番だから",
-    soft:"ふっくら期。かわいいけどね、\nそろそろ動こっか！",
-    natural:"いい感じ！このへんキープ！\n体重より見た目と体調だよ〜",
-    fit:"しゅっとしてきた！！\n服が軽くなったでしょ？",
-    toomuch:"…ねぇ、ちょっと痩せすぎ。\nちゃんと食べて。心配なんだけど"
-  }
-};
+  };
+})(LINES.comeback);
+
 
 /* ============================================================
    4. DOM
@@ -2034,7 +1932,7 @@ function checkUnlocks(){
   });
   if(got.length){
     S.closetNew=true;
-    got.forEach(function(it,i){ toast("🎁 「"+it.name+"」をゲット！", true); });
+    got.forEach(function(it,i){ toast("🎁 「"+it.name+"」をゲット！", true); addAlbum("item", "「"+it.name+"」が増えた日", "item:"+it.id); });
     setTimeout(function(){ sparkle(6,"gift"); }, 300);
     applyLook();
   }
@@ -2055,6 +1953,7 @@ function checkEvolve(){
   if(next <= S.stage) return false;
   var from = S.stage;
   S.stage = next;
+  addAlbum("grow", (STAGES[next]||{}).name + " になった日", "grow"+next);
   playEvolve(from, next);
   return true;
 }
@@ -2095,6 +1994,7 @@ function hatch(){
   }
   setTimeout(function(){
     S.stage=1; S.hatchedAt=Date.now(); S.careDays=0; S.lastCareDay=null; S.messAt=Date.now();
+    addAlbum("egg", "たまごから出てきた日", "hatch");
     eggEl.classList.remove("hatch","on");
     render(); setPose("cheer");
     showTag("うまれた！", true);
@@ -2154,6 +2054,7 @@ function cleanMess(el){
   S.mess.splice(i,1);
   el.classList.add("gone"); setTimeout(function(){ el.remove(); }, 420);
   S.cleanCount++;
+  if(S.cleanCount===1) addAlbum("room","はじめて部屋を片付けた日","clean1");
   S.beauty = clamp(S.beauty+5, 0, 100);
   S.mood   = clamp(S.mood+3, 0, 100);
   S.puni   = clamp(S.puni-0.6, 0, 100);
@@ -2269,8 +2170,11 @@ function setButtons(){
 function openSheet(html){
   sheetInner.innerHTML=html;
   sheet.classList.add("on");
+  sheetInner.scrollTop = 0;
   var first=sheetInner.querySelector("button,input");
-  if(first) first.focus();
+  // preventScroll を付けないと、下のボタンに寄って中身の頭が隠れる
+  if(first){ try{ first.focus({preventScroll:true}); }catch(e){ first.focus(); } }
+  sheetInner.scrollTop = 0;
 }
 function closeSheet(){ sheet.classList.remove("on"); }
 sheet.addEventListener("click", function(e){ if(e.target===sheet) closeSheet(); });
@@ -2293,7 +2197,7 @@ function stampUp(){
 function doMeal(kind){
   closeSheet();
   if(S.mealCount>=3){ say(pick(LINES.overCap)); return; }
-  S.mealCount++;
+  S.mealCount++; S.mealTotal++;
   var before=S.shape, act="cheer";
   if(kind==="healthy"){ S.puni=clamp(S.puni-3,0,100); S.mood=clamp(S.mood+4,0,100); S.energy=clamp(S.energy+6,0,100); S.beauty=clamp(S.beauty+3,0,100); S.healthyTotal++; fx("ヘルシー！","#2FBFA0"); act="clap"; }
   if(kind==="normal"){ S.puni=clamp(S.puni+1,0,100); S.mood=clamp(S.mood+6,0,100); S.energy=clamp(S.energy+12,0,100); fx("いいね！","#FF5E86"); act="cheer"; }
@@ -2416,33 +2320,91 @@ function sfxFanfare(){
 
 var D = null;   // 進行中のダンス
 var danceEl=$("dance"), laneEl=$("lane"), ringEl=$("ring");
-var BPM = 112, BEAT = 60/BPM, TRAVEL = 1.55;   // 1拍の秒数／♪が右端から わ まで飛ぶ秒数
+/* 曲は assets/songs.json が唯一の正。音源は持たず、その場で合成する（ファイルが増えない）。
+   chart は1小節＝8分音符8個ぶんの文字列。x のところに ♪ が出る。 */
+var SONGS = [{"id":"stretch","name":"あさのストレッチ","sub":"ゆっくりめ・はじめての人に","bpm":96,"bars":8,"travel":1.8,"key":392,"chart":["x-x-x-x-","x-x-x-x-","x-x-x-x-","x-x-x-x-","x-x-x-x-","x-x-x-xx","x-x-x-x-","x-x-xx-x"],"mel":[0,null,4,null,7,null,4,null,2,null,5,null,9,null,7,null,0,null,4,null,7,null,12,null,9,null,7,null,4,null,0,null]},{"id":"beat","name":"なるねぇビート","sub":"いつもの","bpm":112,"bars":8,"travel":1.55,"key":440,"chart":["x-x-x-x-","x-x-x-x-","x-x-x-x-","x-xxx-x-","x-xx-x-x","x-xxx-x-","x-xx-x-x","x-xxx-xx"],"mel":[0,null,3,null,5,null,3,null,7,null,5,null,3,null,0,null,0,null,3,null,7,null,10,null,7,null,5,null,3,null,0,null]},{"id":"disco","name":"よふかしディスコ","sub":"はやい・こってり","bpm":132,"bars":8,"travel":1.3,"key":466,"chart":["x-x-x-x-","x-xx-x-x","xx-xx-xx","x-xxx-xx","xx-xx-xx","xxx-xx-x","xx-xxx-x","xxxx-xxx"],"mel":[0,null,0,3,5,null,3,0,7,null,5,3,0,null,3,null,10,null,7,5,3,null,5,7,12,null,10,7,5,3,0,null]}];
+var BEAT = 60/112, TRAVEL = 1.55, SONG = SONGS[1] || SONGS[0];
+function songById(id){
+  for(var i=0;i<SONGS.length;i++) if(SONGS[i].id === id) return SONGS[i];
+  return SONGS[1] || SONGS[0];
+}
+function useSong(sg){
+  SONG = sg; BEAT = 60/sg.bpm; TRAVEL = sg.travel || 1.55;
+}
 
+/* そだてた記録。数えるだけ。順位も他人との比較も出さない。
+   体重は入っていれば小さく出すだけで、主役にはしない */
+function sheetAlbum(){
+  var days = S.careDays || 0;
+  var since = S.hatchedAt ? new Date(S.hatchedAt) : null;
+  var h = '<h3>そだてた記録</h3>';
+  h += '<div class="alb-hero"><b>' + days + '</b><span>日</span><small>' +
+       (since ? (since.getFullYear()+"年"+(since.getMonth()+1)+"月"+since.getDate()+"日から") : "これから") +
+       '</small></div>';
+  h += '<p class="sub">いっしょにやったこと</p><div class="alb-grid">' +
+       albCell("ごはん", S.mealTotal||0) + albCell("運動", S.moveTotal||0) +
+       albCell("ダンス", S.danceTotal||0) + albCell("片付け", S.cleanCount||0) +
+       albCell("服とアクセ", got0(), "個") +
+       '</div>';
+  h += '<div class="alb-cell wide"><span>今の姿</span><b>'+esc((STAGES[S.stage]||{}).name||"")+'</b></div>';
+
+  var a = (S.album||[]).slice().reverse();
+  h += '<p class="sub">おぼえてること</p>';
+  if(!a.length){ h += '<p class="alb-none">まだこれから。ゆっくりで大丈夫！</p>'; }
+  else{
+    h += '<ul class="alb-list">';
+    a.forEach(function(it){ h += '<li data-k="'+it.k+'"><i></i><b>'+esc(it.t)+'</b><span>'+it.d.replace(/-/g,"/")+'</span></li>'; });
+    h += '</ul>';
+  }
+  if(S.wlog && S.wlog.length >= 2){
+    var f = S.wlog[0], l = S.wlog[S.wlog.length-1];
+    h += '<p class="sub">体重（つけていれば）</p><p class="alb-w">' +
+         f.w.toFixed(1) + ' kg <em>→</em> ' + l.w.toFixed(1) + ' kg <small>' + S.wlog.length + '回ぶん</small></p>';
+  }
+  h += '<button class="close" data-act="close">とじる</button>';
+  openSheet(h);
+}
+function got0(){ var n=0; for(var k in S.unlocked) if(S.unlocked[k]) n++; return n; }
+function albCell(label, val, unit){
+  return '<div class="alb-cell"><span>'+label+'</span><b>'+val+'<em>'+(unit||"回")+'</em></b></div>';
+}
 function sheetDance(){
   if(S.stage===0) return;
   if(S.danceCount>=3){ say(pick(LINES.overCap)); return; }
   if(S.energy<25){ playAct("nap"); say(pick(LINES.lowEnergy)); return; }
-  openSheet(
-    '<h3>💃 ダンスでダイエット</h3><p class="sub">右から流れてくる ♪ が、左の白い◯に重なった瞬間に画面をタップ！<br>ぷに −／きれい ＋／キゲン ＋。たいりょくを '+Math.round(S.energy)+' → '+Math.round(S.energy-22)+' 使うよ</p>'+
-    optHTML("danceStart","🎵","踊る！（約20秒）","ベスト："+(S.danceBest? S.danceBest+"点 "+S.danceBestRank+"ランク" : "まだなし"))+
-    '<button class="close" data-act="close">やめとく</button>'
-  );
+  var html = '<h3>ダンスでダイエット</h3><p class="sub">右から流れてくる ♪ が、左の白い◯に重なった瞬間に画面をタップ！<br>すきな曲をえらんでね。どれを踊っても同じだけ動けるよ</p>';
+  SONGS.forEach(function(sg){
+    var b = (S.danceBestBy && S.danceBestBy[sg.id]) || null;
+    var secs = Math.round((sg.bars||8)*4*60/sg.bpm + 3);
+    html += optHTML("song:"+sg.id, "♪", sg.name,
+      sg.sub + "／約" + secs + "秒・BPM" + sg.bpm + (b ? "　ベスト " + b.score + "点 " + b.rank : ""));
+  });
+  openSheet(html + '<button class="close" data-act="close">やめとく</button>');
 }
 function makeChart(){
-  // 8小節。前半は4分音符、後半に8分が混ざる（合計28個）
-  var t=[], b=0, bar;
-  for(bar=0;bar<8;bar++){
-    for(var q=0;q<4;q++){
-      var at = bar*4+q;
-      t.push(at);
-      if(bar>=3 && (q===1 || (bar>=6 && q===3))) t.push(at+0.5);
-    }
+  // 曲の chart をそのまま並べる。1文字＝8分音符ひとつ
+  var t=[], bars = SONG.bars || SONG.chart.length;
+  for(var bar=0; bar<bars; bar++){
+    var pat = SONG.chart[bar % SONG.chart.length];
+    for(var i=0;i<8;i++) if(pat.charAt(i) === "x") t.push(bar*4 + i*0.5);
   }
   return t.map(function(x){ return x*BEAT; });
 }
-function startDance(){
+/* 曲のメロディを先にまとめて予約する。あとから鳴らすとズレるので */
+function scheduleSong(ac, t0){
+  if(!ac || !SONG.mel || !SONG.mel.length) return;
+  var bars = SONG.bars || SONG.chart.length, key = SONG.key || 440;
+  for(var i=0; i<bars*8; i++){
+    var m = SONG.mel[i % SONG.mel.length];
+    if(m == null) continue;
+    tone(key*Math.pow(2, m/12), BEAT*0.42, "triangle", 0.055, t0 + i*BEAT*0.5);
+  }
+}
+function startDance(songId){
   closeSheet();
   if(dancing) return;
+  useSong(songById(songId || S.lastSong || "beat"));
+  S.lastSong = SONG.id;
   audio();
   document.documentElement.style.setProperty("--beat2",(BEAT*2).toFixed(3)+"s");
   danceEl.classList.add("on"); danceEl.setAttribute("aria-hidden","false");
@@ -2456,6 +2418,7 @@ function startDance(){
   if(actTimer){ clearTimeout(actTimer); actTimer=null; }
   for(var k in ACT){ if(ACT[k].css) floatEl.classList.remove(ACT[k].css); }
   say(pick(LINES.dance.start));
+  $("dSong").textContent = SONG.name;
   var lead = BEAT*4;   // カウント 3・2・1・GO
   var chart = makeChart().map(function(t){ return t+lead; });
   D = { t0:null, notes:chart.map(function(t,i){ return {t:t, el:null, done:false, cls: i%2?"b":""}; }),
@@ -2468,6 +2431,7 @@ function startDance(){
   if(ac){
     var totalBeats = Math.ceil(D.end/BEAT);
     for(var i=0;i<totalBeats;i++){ var w=D.ac0+i*BEAT; if(i%2===0) sfxKick(w); else sfxHat(w); }
+    scheduleSong(ac, D.ac0 + lead);
   }
   D.t0 = performance.now();
   requestAnimationFrame(danceFrame);
@@ -2543,6 +2507,12 @@ function endDance(aborted){
   S.puni=clamp(S.puni+dPuni,0,100); S.beauty=clamp(S.beauty+dBeauty,0,100); S.mood=clamp(S.mood+dMood,0,100); S.energy=clamp(S.energy+dEnergy,0,100);
   S.danceCount++; S.danceTotal++;
   if(r.score > S.danceBest){ S.danceBest=r.score; }
+  if(!S.danceBestBy) S.danceBestBy = {};
+  var pb = S.danceBestBy[SONG.id];
+  if(!pb || r.score > pb.score){
+    S.danceBestBy[SONG.id] = {score:r.score, rank:rank};
+    addAlbum("dance", "「"+SONG.name+"」を "+rank+" ランクで踊れた日", "dance:"+SONG.id+":"+rank);
+  }
   var RANKV={S:4,A:3,B:2,C:1};
   if(!S.danceBestRank || RANKV[rank] > RANKV[S.danceBestRank]) S.danceBestRank = rank;
   if(rank==="S"||rank==="A"){ sfxFanfare(); playAct("win"); } else playAct("cheer");
@@ -2638,10 +2608,14 @@ function showChenMe(){
 }
 
 /* クリック委譲 */
+// ヘッダーの「そだてて◯日」から、そだてた記録をひらく
+$("age").addEventListener("click", function(){ if(S.stage>0) sheetAlbum(); });
 sheetInner.addEventListener("click", function(e){
   var b=e.target.closest("button"); if(!b) return;
   var a=b.getAttribute("data-act");
   if(a==="close"){ closeSheet(); return; }
+  if(a.indexOf("song:")===0){ startDance(a.slice(5)); return; }
+  if(a==="album"){ sheetAlbum(); return; }
   if(a==="danceStart"){ startDance(); return; }
   if(a==="wearOutfit"){
     var id=b.getAttribute("data-id"); if(!S.unlocked[id]) return;
@@ -2727,7 +2701,8 @@ window.__naru={ get:function(){ return S; }, set:function(o){ Object.assign(S,o)
   meal:doMeal, move:doMove, look:doLook, poke:pokeNaru, line:lookLine, lines:LINES, act:playAct, pose:setPose, idlePose:idlePose,
   sprite:function(){return poseNow;}, render:render, face:setFace, mess:function(n){ spawnMess(n||1); renderMess(); save(); },
   clean:cleanMess, evolve:function(){ S.careDays=STAGES[Math.min(4,S.stage+1)].days; return checkEvolve(); }, hatch:hatch, egg:tapEgg,
-  dance:startDance, endDance:endDance, danceState:function(){ return D; }, closet:sheetCloset, wear:function(o,a){ if(o) S.outfit=o; if(a) S.acc=a; applyOutfit(); render(); save(); },
+  album:sheetAlbum, lines:LINES, songs:SONGS, dance:startDance, endDance:endDance,
+  charts:function(){ var o={}; SONGS.forEach(function(g){ var k=SONG; useSong(g); o[g.id]=makeChart().length; useSong(k); }); return o; }, danceState:function(){ return D; }, closet:sheetCloset, wear:function(o,a){ if(o) S.outfit=o; if(a) S.acc=a; applyOutfit(); render(); save(); },
   arm:function(l,r){ POSE.__t={al:l,ar:r}; setPose("__t"); },
   joint:function(o){ POSE.__t=o; setPose("__t"); }, gl:function(){ return G; }, fit:function(v){ FIT=v; },
   dayEvent:todayEvent, season:thisSeason, renderDay:renderDay,
