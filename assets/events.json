@@ -1,0 +1,78 @@
+{
+  "_comment": "1日に1つだけ起きる小さな出来事。日付をシードにして選ぶので、同じ日なら何度開いても同じものが出る。ノルマではないので、取らなくても翌日ふつうに消える。催促もしない。",
+  "version": 1,
+  "events": [
+    {
+      "id": "find_hairtie",
+      "kind": "find",
+      "name": "ヘアゴム",
+      "img": "assets/found/hairtie.svg",
+      "say": "あー！これこれ！\nずっとどこ行ったんだろって思ってた"
+    },
+    {
+      "id": "find_coin",
+      "kind": "find",
+      "name": "500円玉",
+      "img": "assets/found/coin.svg",
+      "say": "500円！？\nこういう日って、なんかいい日じゃない？"
+    },
+    {
+      "id": "find_letter",
+      "kind": "find",
+      "name": "手紙",
+      "img": "assets/found/letter.svg",
+      "say": "あ、前に書いたやつだ。\n『今日の自分、けっこうがんばった』って書いてある"
+    },
+    {
+      "id": "find_photo",
+      "kind": "find",
+      "name": "昔の写真",
+      "img": "assets/found/photo.svg",
+      "say": "この写真、去年のだ〜。\n見返すと、ちゃんと変わってるんだよね"
+    },
+    {
+      "id": "word_water",
+      "kind": "word",
+      "say": "今日ね、なんとなく水がおいしい。\nそれだけ。それだけなんだけど"
+    },
+    {
+      "id": "word_sleep",
+      "kind": "word",
+      "say": "昨日ぐっすり寝れた〜。\n寝た日って、なんか世界がやさしい"
+    },
+    {
+      "id": "word_song",
+      "kind": "word",
+      "say": "朝から同じ曲がずっと頭で流れてる。\nこういう日、嫌いじゃない"
+    },
+    {
+      "id": "word_window",
+      "kind": "word",
+      "say": "さっき窓あけたら、空気が変わってた。\n季節って急に来るよね"
+    },
+    {
+      "id": "word_mirror",
+      "kind": "word",
+      "say": "今日の鏡、ちょっと good だった。\n気のせいでもいいの、その気分が続くから"
+    },
+    {
+      "id": "word_nothing",
+      "kind": "word",
+      "say": "今日はとくに何もない日。\nそういう日がいちばん続くんだよ〜"
+    },
+    {
+      "id": "deco_flower",
+      "kind": "deco",
+      "name": "花",
+      "img": "assets/deco/flower.svg",
+      "say": "床のすみ、ちょっと飾ってみた。\nこういうの、意外と効くんだよ"
+    },
+    {
+      "id": "deco_balloon",
+      "kind": "deco",
+      "name": "風船",
+      "img": "assets/deco/balloon.svg",
+      "say": "なんとなく気分あがるもの置いてみた〜"
+    }
+  ]
+}

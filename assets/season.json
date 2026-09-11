@@ -1,0 +1,10 @@
+{
+  "_comment": "月で自動的に変わる部屋の小物。壁ぎわ（棚の上）に置く。まずは9〜12月の4パターン。",
+  "version": 1,
+  "seasons": [
+    { "month": 9,  "id": "tsukimi",   "name": "お月見",       "img": "assets/season/tsukimi.svg",   "say": "そろそろお月見だね〜" },
+    { "month": 10, "id": "halloween", "name": "ハロウィン",   "img": "assets/season/halloween.svg", "say": "かぼちゃ出しちゃった。気が早い？" },
+    { "month": 11, "id": "momiji",    "name": "もみじ",       "img": "assets/season/momiji.svg",    "say": "拾ってきたの。かわいくない？" },
+    { "month": 12, "id": "xmas",      "name": "クリスマス",   "img": "assets/season/xmas.svg",      "say": "今年もこれ出す季節になった〜" }
+  ]
+}

@@ -265,6 +265,29 @@ body{
 @keyframes puff{0%{transform:translate(0,0) scale(.2);opacity:0}
                 25%{opacity:1}
                 100%{transform:translate(var(--px),var(--py)) scale(1);opacity:0}}
+/* 今日の出来事（落とし物・その日だけの飾り）と、月で変わる小物 */
+.dayitem{
+  position:absolute;z-index:5;border:0;background:none;padding:0;
+  filter:drop-shadow(0 3px 3px rgba(58,32,44,.20));
+  animation:messin .5s cubic-bezier(.2,1.6,.4,1) both;
+}
+.dayitem svg{width:100%;height:100%;display:block}
+.dayitem.find{
+  width:46px;height:46px;left:9%;bottom:18%;cursor:pointer;touch-action:manipulation;
+  animation:messin .5s cubic-bezier(.2,1.6,.4,1) both, tw 2.4s ease-in-out 1s infinite;
+}
+.dayitem.find::after{content:"";position:absolute;inset:-13px}
+@keyframes tw{0%,88%,100%{transform:translateY(0) rotate(0)}94%{transform:translateY(-4px) rotate(-6deg)}}
+.dayitem.find:active{transform:scale(.88)}
+.dayitem.deco{width:44px;height:44px;left:3%;bottom:2.5%;pointer-events:none}
+.dayitem.gone{animation:messout .36s cubic-bezier(.3,1.6,.5,1) forwards;pointer-events:none}
+.season{
+  position:absolute;z-index:4;right:16px;bottom:43%;width:54px;height:54px;pointer-events:none;
+  filter:drop-shadow(0 3px 3px rgba(58,32,44,.18));
+  animation:messin .6s cubic-bezier(.2,1.5,.4,1) both;
+}
+.season svg{width:100%;height:100%;display:block}
+
 .mess-hint{
   position:absolute;right:10px;top:116px;z-index:4;
   background:rgba(36,31,30,.72);color:#fff;border:0;border-radius:999px;
@@ -876,7 +899,7 @@ var store = {
 var DEF = {
   puni:52, mood:70, energy:80, beauty:65,
   weight:null, prevWeight:null,
-  streak:0, stamps:0, adCount:0, messDay:"", messToday:0,
+  streak:0, stamps:0, adCount:0, messDay:"", messToday:0, evDay:"", evTaken:false, evSaid:false,
   lastDay:null, lastTs:Date.now(),
   mealCount:0, moveCount:0, danceCount:0,
   shape:"natural", visits:0, lookRepeat:0,
@@ -913,6 +936,46 @@ function todayKey(d){
 function clamp(v,a,b){ return Math.max(a, Math.min(b, v)); }
 function save(){ S.lastTs = Date.now(); store.save(S); }
 function pick(a){ return a[Math.floor(Math.random()*a.length)]; }
+/* 文字列 → 32bitの種（FNV-1a）。日付を入れると、その日ぶんだけ決まった乱数が出る */
+function seedOf(str){
+  var h = 2166136261 >>> 0;
+  for(var i=0;i<str.length;i++){ h ^= str.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; }
+  return h >>> 0;
+}
+function rngOf(seed){
+  var a = seed >>> 0;
+  return function(){
+    a = (a + 0x6D2B79F5) | 0;
+    var t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+function rawEvent(key){
+  if(!EVENTS.length) return null;
+  var r = rngOf(seedOf("ev:" + key))();
+  return EVENTS[Math.floor(r * EVENTS.length) % EVENTS.length];
+}
+// 今日の出来事。日付が同じなら必ず同じものを返す。
+// 昨日と同じものは外す（2日つづけて同じだと「起きた感」が消えるため）
+function eventFor(key){
+  if(!EVENTS.length) return null;
+  var d = new Date(key + "T12:00:00");
+  var y = new Date(d.getTime() - 86400000);
+  var yk = y.getFullYear() + "-" + String(y.getMonth()+1).padStart(2,"0") + "-" + String(y.getDate()).padStart(2,"0");
+  var prev = rawEvent(yk);
+  var pool = EVENTS;
+  if(prev && EVENTS.length > 1) pool = EVENTS.filter(function(e){ return e.id !== prev.id; });
+  var r = rngOf(seedOf("ev:" + key))();
+  return pool[Math.floor(r * pool.length) % pool.length];
+}
+function todayEvent(){ return eventFor(todayKey()); }
+// 今月の小物。載っていない月は何も置かない
+function thisSeason(){
+  var m = new Date().getMonth() + 1;
+  for(var i=0;i<SEASONS.length;i++) if(SEASONS[i].m === m) return SEASONS[i];
+  return null;
+}
 
 /* ============================================================
    2. 成長段階・服・アクセ・散らかりものの定義
@@ -972,9 +1035,14 @@ var ACCS = [
 /* 床に落ちるもの。中身は assets/props.json（＋ assets/props/*.svg）が唯一の正で、
    build.py が画像ごとここに埋め込む。絵はキャラと同じ「太い黒線＋ベタ塗り」にそろえてある。 */
 var PROPS = [{"id":"snack","n":"お菓子の袋","svg":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\"><g stroke=\"#000\" stroke-width=\"3.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"><path d=\"M18 16l4 3 4-3 4 3 4-3 4 3 4-3v34l-4-3-4 3-4-3-4 3-4-3-4 3z\" fill=\"#FF9EB8\"/><path d=\"M18 27h28\" fill=\"none\" stroke-width=\"2.8\" stroke=\"#E0658A\"/><path d=\"M18 38h28\" fill=\"none\" stroke-width=\"2.8\" stroke=\"#E0658A\"/></g></svg>","pos":{"side":"any","y":[4,15],"rot":[-22,22],"scale":1.0},"say":["あ、それ食べた。おいしかった！","ありがと〜、ちゃんと捨てるね","お菓子はね、責めない。楽しかったならヨシ！","わ、拾ってくれた。助かる〜","うん、また食べる。でも今日は片付いた！"]},{"id":"shirt","n":"脱ぎっぱなしの服","svg":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\"><g fill=\"#FDCB23\" stroke=\"#000\" stroke-width=\"3.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"><path d=\"M24 16l-13 7 5 9 6-3v19h24V29l6 3 5-9-13-7z\"/><path d=\"M24 16c1.6 4.4 14.4 4.4 16 0\" fill=\"none\"/></g></svg>","pos":{"side":"any","y":[3,12],"rot":[-30,30],"scale":1.05},"say":["たたむの、あとでいいかなって思ってた","ありがと！部屋がすっとした","これ着心地よくてさ〜","お、ナイス。あとで洗うね","脱いだとこに置いちゃうの、あるある"]},{"id":"bottle","n":"ペットボトル","svg":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\"><g stroke=\"#000\" stroke-width=\"3.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"><rect x=\"26\" y=\"8\" width=\"12\" height=\"7\" rx=\"2\" fill=\"#5EC8E8\"/><path d=\"M27 15h10c0 5 6 6 6 14v21a6 6 0 0 1-6 6H27a6 6 0 0 1-6-6V29c0-8 6-9 6-14z\" fill=\"#DFF4FB\"/><path d=\"M21 34h22\" fill=\"none\" stroke-width=\"2.6\"/></g></svg>","pos":{"side":"any","y":[3,13],"rot":[-40,40],"scale":0.95},"say":["水はちゃんと飲んでるよ！えらい？","助かる〜ありがと","空いたの置きっぱなしにしちゃうんだよね","おっ、きれいになった","これ今日3本目。飲んでるでしょ？"]},{"id":"sock","n":"くつ下","svg":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\"><g stroke=\"#000\" stroke-width=\"3.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"><path d=\"M22 12h16v22c0 6 14 6 14 15s-9 11-15 7L24 46c-2-1-2-4-2-6z\" fill=\"#FFFFFF\"/><path d=\"M22 20h16\" fill=\"none\" stroke-width=\"2.6\"/></g></svg>","pos":{"side":"any","y":[3,11],"rot":[-35,35],"scale":0.9},"say":["あー！片方さがしてたやつ","ありがと、洗濯かごに入れとく","くつ下っていつの間にか散らばるよね","ナイスキャッチ！","もう片方はどこ行ったんだろ、、、"]},{"id":"box","n":"通販の箱","svg":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\"><g stroke=\"#000\" stroke-width=\"3.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"><path d=\"M10 24h44v26H10z\" fill=\"#D9A86C\"/><path d=\"M10 24l6-10h32l6 10\" fill=\"#EFC894\"/><path d=\"M32 14v10M32 24v26\" fill=\"none\" stroke-width=\"2.6\"/><path d=\"M24 32h16\" fill=\"none\" stroke-width=\"2.6\" stroke=\"#A87A42\"/></g></svg>","pos":{"side":"any","y":[3,10],"rot":[-14,14],"scale":1.1},"say":["届いたの、うれしくて開けたまんまだった","ありがと！つぶしておくね","また買っちゃった、、、ないしょね","おお、床が広くなった","箱って気づくと増えてるんだよね"]},{"id":"cup","n":"カップ麺","svg":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\"><g stroke=\"#000\" stroke-width=\"3.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"><path d=\"M17 20h30l-4 30H21z\" fill=\"#FFF4E2\"/><rect x=\"14\" y=\"13\" width=\"36\" height=\"8\" rx=\"3\" fill=\"#E8503F\"/><path d=\"M22 30h20\" fill=\"none\" stroke-width=\"2.6\" stroke=\"#E8503F\"/></g></svg>","pos":{"side":"any","y":[3,12],"rot":[-18,18],"scale":1.0},"say":["夜中に食べるとおいしいんだよね〜","ありがと！次はちゃんと片付ける","スープは残したよ、えらくない？","お、すっきりした！","食べたことは消さない。片付けるだけ！"]}];
+/* 1日1つの小さな出来事と、月で変わる部屋の小物。
+   どちらも assets/*.json が唯一の正で、build.py が画像ごと埋め込む。
+   選び方は「日付をシードにした疑似乱数」なので、同じ日なら何度開いても同じ。 */
+var EVENTS = [{"id":"find_hairtie","k":"find","say":"あー！これこれ！\nずっとどこ行ったんだろって思ってた","svg":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\"><g fill=\"none\" stroke=\"#000\" stroke-width=\"3.4\"><ellipse cx=\"32\" cy=\"34\" rx=\"19\" ry=\"13\" stroke-width=\"7.5\" stroke=\"#F06C9B\"/><ellipse cx=\"32\" cy=\"34\" rx=\"19\" ry=\"13\"/><ellipse cx=\"32\" cy=\"34\" rx=\"11.5\" ry=\"5.5\"/></g></svg>","n":"ヘアゴム"},{"id":"find_coin","k":"find","say":"500円！？\nこういう日って、なんかいい日じゃない？","svg":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\"><g stroke=\"#000\" stroke-width=\"3.4\"><circle cx=\"32\" cy=\"32\" r=\"20\" fill=\"#FFD54A\"/><circle cx=\"32\" cy=\"32\" r=\"13\" fill=\"none\" stroke-width=\"2.6\"/><circle cx=\"32\" cy=\"32\" r=\"4.5\" fill=\"#FFF0B8\" stroke-width=\"2.6\"/></g></svg>","n":"500円玉"},{"id":"find_letter","k":"find","say":"あ、前に書いたやつだ。\n『今日の自分、けっこうがんばった』って書いてある","svg":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\"><g stroke=\"#000\" stroke-width=\"3.4\" stroke-linejoin=\"round\"><rect x=\"8\" y=\"17\" width=\"48\" height=\"32\" rx=\"3\" fill=\"#FFF8EC\"/><path d=\"M8 19l24 17 24-17\" fill=\"none\"/><path d=\"M26 33l-16 15M38 33l16 15\" fill=\"none\" stroke-width=\"2.6\"/></g></svg>","n":"手紙"},{"id":"find_photo","k":"find","say":"この写真、去年のだ〜。\n見返すと、ちゃんと変わってるんだよね","svg":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\"><g stroke=\"#000\" stroke-width=\"3.4\" stroke-linejoin=\"round\"><rect x=\"10\" y=\"12\" width=\"44\" height=\"40\" rx=\"3\" fill=\"#FFFFFF\"/><rect x=\"15\" y=\"17\" width=\"34\" height=\"24\" fill=\"#BFE6F5\"/><path d=\"M15 41l10-9 7 6 6-7 11 10z\" fill=\"#8FD3A8\"/><circle cx=\"41\" cy=\"24\" r=\"3.6\" fill=\"#FFD54A\"/></g></svg>","n":"昔の写真"},{"id":"word_water","k":"word","say":"今日ね、なんとなく水がおいしい。\nそれだけ。それだけなんだけど"},{"id":"word_sleep","k":"word","say":"昨日ぐっすり寝れた〜。\n寝た日って、なんか世界がやさしい"},{"id":"word_song","k":"word","say":"朝から同じ曲がずっと頭で流れてる。\nこういう日、嫌いじゃない"},{"id":"word_window","k":"word","say":"さっき窓あけたら、空気が変わってた。\n季節って急に来るよね"},{"id":"word_mirror","k":"word","say":"今日の鏡、ちょっと good だった。\n気のせいでもいいの、その気分が続くから"},{"id":"word_nothing","k":"word","say":"今日はとくに何もない日。\nそういう日がいちばん続くんだよ〜"},{"id":"deco_flower","k":"deco","say":"床のすみ、ちょっと飾ってみた。\nこういうの、意外と効くんだよ","svg":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\"><g stroke=\"#000\" stroke-width=\"3.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"><path d=\"M26 34c-2-8 0-14 3-18M38 34c2-7 1-12-1-16\" fill=\"none\" stroke-width=\"2.8\"/><g fill=\"#FF8FB1\"><circle cx=\"29\" cy=\"13\" r=\"5\"/><circle cx=\"23\" cy=\"18\" r=\"5\"/><circle cx=\"35\" cy=\"18\" r=\"5\"/><circle cx=\"29\" cy=\"23\" r=\"5\"/></g><circle cx=\"29\" cy=\"18\" r=\"3\" fill=\"#FFD54A\"/><g fill=\"#FFE07A\"><circle cx=\"37\" cy=\"14\" r=\"4\"/><circle cx=\"43\" cy=\"18\" r=\"4\"/><circle cx=\"37\" cy=\"22\" r=\"4\"/></g><path d=\"M22 34h20l-3 22H25z\" fill=\"#BFE6F5\"/></g></svg>","n":"花"},{"id":"deco_balloon","k":"deco","say":"なんとなく気分あがるもの置いてみた〜","svg":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\"><g stroke=\"#000\" stroke-width=\"3.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"><path d=\"M32 6c9 0 15 7 15 15 0 10-9 17-15 21-6-4-15-11-15-21 0-8 6-15 15-15z\" fill=\"#FF8FB1\"/><path d=\"M29 42l3 4 3-4z\" fill=\"#FF8FB1\"/><path d=\"M32 46c4 5-4 8 0 12\" fill=\"none\" stroke-width=\"2.6\"/><path d=\"M24 16c1-4 4-6 7-6.5\" fill=\"none\" stroke=\"#fff\" stroke-width=\"3\"/></g></svg>","n":"風船"}], SEASONS = [{"m":9,"id":"tsukimi","n":"お月見","say":"そろそろお月見だね〜","svg":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\"><g stroke=\"#000\" stroke-width=\"3.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"><path d=\"M14 56c2-14 4-22 3-32\" fill=\"none\"/><path d=\"M17 24c4-6 9-6 12-10-1 7-4 11-12 14z\" fill=\"#E8D7A8\"/><path d=\"M22 52h30v6H22z\" fill=\"#D8B48A\"/><circle cx=\"31\" cy=\"46\" r=\"6\" fill=\"#FFF8EC\"/><circle cx=\"43\" cy=\"46\" r=\"6\" fill=\"#FFF8EC\"/><circle cx=\"37\" cy=\"37\" r=\"6\" fill=\"#FFF8EC\"/></g></svg>"},{"m":10,"id":"halloween","n":"ハロウィン","say":"かぼちゃ出しちゃった。気が早い？","svg":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\"><g stroke=\"#000\" stroke-width=\"3.2\" stroke-linejoin=\"round\"><path d=\"M32 16c-13 0-21 8-21 21s8 20 21 20 21-8 21-20-8-21-21-21z\" fill=\"#FF9A3C\"/><path d=\"M32 16c0-5-2-8-6-10 6-1 9 2 10 6\" fill=\"#7CB86A\"/><path d=\"M22 33l7-4 1 8zM42 33l-7-4-1 8z\" fill=\"#241F1E\"/><path d=\"M23 42h18l-4 5h-10z\" fill=\"#241F1E\"/></g></svg>"},{"m":11,"id":"momiji","n":"もみじ","say":"拾ってきたの。かわいくない？","svg":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\"><g stroke=\"#000\" stroke-width=\"3\" stroke-linejoin=\"round\"><path d=\"M26 10l5 10 8-6-3 10 10-1-7 7 9 5-10 2 4 9-9-5-2 10-5-9-8 6 2-10-10 1 7-8-9-4 10-3-4-9 9 5z\" fill=\"#E8503F\"/><path d=\"M26 34v18\" fill=\"none\" stroke-width=\"2.6\"/></g></svg>"},{"m":12,"id":"xmas","n":"クリスマス","say":"今年もこれ出す季節になった〜","svg":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\"><g stroke=\"#000\" stroke-width=\"3.2\" stroke-linejoin=\"round\"><path d=\"M32 6l11 16H21z\" fill=\"#4FA86A\"/><path d=\"M32 18l14 18H18z\" fill=\"#4FA86A\"/><path d=\"M32 30l17 20H15z\" fill=\"#4FA86A\"/><rect x=\"28\" y=\"50\" width=\"8\" height=\"8\" fill=\"#B07A4A\"/><circle cx=\"26\" cy=\"33\" r=\"2.6\" fill=\"#FF6B8A\"/><circle cx=\"39\" cy=\"42\" r=\"2.6\" fill=\"#FFD54A\"/><circle cx=\"28\" cy=\"45\" r=\"2.6\" fill=\"#6BB7FF\"/></g></svg>"}];
 var PROP_IX = {}; PROPS.forEach(function(p,i){ PROP_IX[p.id] = i; });
 // 何日空けても、床に出るのは最大3個まで。久しぶりに開いた人を絶望させないため
 var MESS_MAX = 3, MESS_PER_DAY = 3, MESS_EVERY_MS = 200*60000;   // 3時間20分にひとつ
+var DAY_X = [3, 9];    // 今日の出来事を置くx（CSSの .dayitem と合わせる）
 
 /* ============================================================
    3. セリフ
@@ -1166,6 +1234,59 @@ function say(text){
     }
   }, 34);
 }
+/* 今日の出来事と、季節の小物を置く。
+   ノルマにしないので、バッジも催促も出さない。取らなければ翌日ふつうに消える */
+function renderDay(){
+  var t = todayKey();
+  if(S.evDay !== t){ S.evDay = t; S.evTaken = false; S.evSaid = false; }
+  var old = stage.querySelectorAll(".dayitem,.season");
+  Array.prototype.forEach.call(old, function(el){ el.remove(); });
+  if(S.stage === 0) return;
+
+  var se = thisSeason();
+  if(se){
+    var d = document.createElement("div");
+    d.className = "season"; d.innerHTML = se.svg;
+    d.setAttribute("aria-label", se.n);
+    stage.appendChild(d);
+  }
+  var ev = todayEvent();
+  if(!ev) return;
+  if(ev.k === "find" && !S.evTaken){
+    var b = document.createElement("button");
+    b.className = "dayitem find"; b.innerHTML = ev.svg;
+    b.setAttribute("aria-label", ev.n + "をひろう");
+    b.addEventListener("click", function(e){ e.stopPropagation(); takeDayItem(b, ev); });
+    stage.appendChild(b);
+  }else if(ev.k === "deco"){
+    var g = document.createElement("div");
+    g.className = "dayitem deco"; g.innerHTML = ev.svg;
+    g.setAttribute("aria-label", ev.n);
+    stage.appendChild(g);
+  }
+}
+function takeDayItem(el, ev){
+  if(S.evTaken) return;
+  S.evTaken = true;
+  var rect = el.getBoundingClientRect(), sr = stage.getBoundingClientRect();
+  puff(rect.left - sr.left + rect.width/2, rect.top - sr.top + rect.height/2);
+  el.classList.add("gone");
+  setTimeout(function(){ el.remove(); }, 420);
+  playAct("cheer"); setFace("smirk", 1200);
+  say(ev.say);
+  sparkle(4, "star");
+  save();
+}
+/* 今日だけの一言。1日1回、開いてしばらくしてから、そっと言うだけ */
+function maybeDayWord(){
+  var ev = todayEvent();
+  if(!ev || ev.k !== "word" || S.evSaid) return;
+  setTimeout(function(){
+    if(S.evSaid || document.hidden || sheet.classList.contains("on") || dancing) return;
+    S.evSaid = true; say(ev.say); save();
+  }, 7000);
+}
+
 /* 片付けた場所に出る、小さな線画のポンッ */
 function puff(px, py){
   var el=document.createElement("div");
@@ -2000,6 +2121,8 @@ function spawnMess(n, typeIdx){
       x = side<0 ? 6+Math.random()*18 : 64+Math.random()*23;
       var ok = true;
       for(var q=0;q<S.mess.length;q++){ if(Math.abs(S.mess[q].x - x) < 13){ ok=false; break; } }
+      // 今日の出来事（落とし物・飾り）の上にも置かない
+      if(ok) for(var q2=0;q2<DAY_X.length;q2++){ if(Math.abs(DAY_X[q2] - x) < 12){ ok=false; break; } }
       if(ok) break;
     }
     S.mess.push({t: ti, x:Math.round(x),
@@ -2221,6 +2344,8 @@ function lookLine(){
   if(S.beauty <= 30) ctx = ctx.concat(L.beautyLow);
   if(S.mess.length >= 1) ctx = ctx.concat(LINES.mess.some);
   if(S.weight == null) ctx = ctx.concat(L.noWeight);
+  var dayEv = todayEvent();
+  if(dayEv && dayEv.k === "word") ctx.push(dayEv.say);   // 今日だけの一言
 
   if(S.shape === "chubby" || S.shape === "toomuch") ctx.push(LINES.shape[S.shape]);
   // 6割は今の状況に刺さるセリフ、4割は汎用からランダム
@@ -2565,6 +2690,7 @@ $("avatarWrap").addEventListener("click", function(e){ if(e.target.closest(".egg
 var backMsg=tickOffline();
 render();
 renderMess();
+renderDay();
 setButtons();
 applyOutfit();
 save();
@@ -2582,6 +2708,7 @@ if(S.stage===0){
 }else{
   var evolved = checkEvolve();
   if(!evolved) setTimeout(function(){ say(backMsg || pick(LINES.welcome)); react("happy"); }, 300);
+  maybeDayWord();          // 今日だけの一言。歓迎のあとに、そっと1回だけ
 }
 idleLoop();
 
@@ -2591,6 +2718,7 @@ setInterval(function(){
   var hours=(Date.now()-(S.lastTs||Date.now()))/3600000;
   applyElapsed(hours);
   if(tickMess()){ renderMess(); if(!sheet.classList.contains("on")) say(pick(LINES.mess.some)); }
+  if(S.evDay !== todayKey()) renderDay();          // 日付をまたいだら置き直す
   render(); save();
 }, 60000);
 
@@ -2602,6 +2730,8 @@ window.__naru={ get:function(){ return S; }, set:function(o){ Object.assign(S,o)
   dance:startDance, endDance:endDance, danceState:function(){ return D; }, closet:sheetCloset, wear:function(o,a){ if(o) S.outfit=o; if(a) S.acc=a; applyOutfit(); render(); save(); },
   arm:function(l,r){ POSE.__t={al:l,ar:r}; setPose("__t"); },
   joint:function(o){ POSE.__t=o; setPose("__t"); }, gl:function(){ return G; }, fit:function(v){ FIT=v; },
+  dayEvent:todayEvent, season:thisSeason, renderDay:renderDay,
+  evFor:eventFor,
   unlockAll:function(){ OUTFITS.concat(ACCS).forEach(function(i){ S.unlocked[i.id]=1; }); save(); }, unlocks:checkUnlocks, outfits:OUTFITS, accs:ACCS, stages:STAGES, cache:spriteCache };
 
 })();
