@@ -5,8 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
 <title>なるねぇといっしょ｜笑けるダイエット育成</title>
 <meta name="theme-color" content="#FFD400">
-<link rel="preload" as="image" href="naru.webp?v=1919507a">
-<link rel="preload" as="image" href="face.webp?v=d99e0e8a">
+<link rel="preload" as="image" href="naru.webp?v=9dadb705">
 <link rel="apple-touch-icon" href="icon.png?v=4a07dc6c">
 <link rel="icon" href="icon.png?v=4a07dc6c">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -277,54 +276,33 @@ body{
 /* 成長段階（大きさ）と体型（ぷに度）は、このレイヤーの拡大率で表す。
    --gx / --gy は JS が状態から計算して入れる */
 .av-grow{
-  position:relative;height:100%;width:auto;aspect-ratio:324/355;
+  position:relative;height:100%;width:auto;aspect-ratio:432/550;
   transform:scale(var(--gx,1),var(--gy,1));
   transform-origin:50% 100%;
   transition:transform 1.1s cubic-bezier(.34,1.3,.5,1);
 }
-/* 12ポーズを1枚にまとめたスプライトシート（3Dレンダーを2Dに焼いたもの）。
-   背景の表示位置を切り替える＝パラパラ漫画。画像は1リクエストで済む */
+/* 1枚のアトラスから切り出した15個のパーツを、関節でつないで動かす。
+   コマ送りではないので、角度をいくつ動かしても絵は増えない＝どこまでも滑らか。 */
 .body{
   position:relative;width:100%;height:100%;
   transform-origin:50% 100%;              /* 足を床につけたまま沈む */
   transition:filter .9s ease;will-change:transform;
 }
-/* 1枚のシートに「体 / 頭 / ポニーテール」を3段で持たせ、層ごとに別々に動かす。
-   同じ絵でも、頭が遅れて揺れてポニテがさらに遅れて振れると、生きて見える */
-.sprite{
-  position:absolute;inset:0;
-  background-size:400% 3600%;
-  background-repeat:no-repeat;
-  background-position:33.333% 0%;
+.rig{position:absolute;inset:0;overflow:visible}
+/* 中身は常に 432×549 で考えて、表示サイズぶんだけ拡大する */
+.rigbox{
+  position:absolute;left:0;top:0;
+  transform-origin:0 0;transform:scale(var(--rk,1)) translate(var(--rdx,0px),0);
   will-change:transform;
 }
-/* コマとコマの間を埋めるため、各層を2枚重ねにする。
-   下＝今のコマ、上＝次のコマ。上の不透明度を 0→1 に動かすと、
-   6fpsのパラパラでも60fpsで溶けるように変わる（枚数を増やさずに滑らかにする） */
-.pony-layer{position:absolute;inset:0;z-index:1;transform-origin:var(--px,50%) var(--py,16%)}
-.sp-pony{z-index:auto}
-.nx{opacity:var(--mix,0)}
-/* 頭は混ぜない。眉や口が二重に見えて「バグ」に見えるため。
-   頭の動きはばねが60fpsで別に付けているので、混ぜなくても止まって見えない。
-   ポニーテールは動きが小さいとき（待機）だけ混ぜる。ダンスのように大きく振れると
-   輪郭がはっきり二重になってしまうので、そのときは切る */
-.sp-head.nx{opacity:0}
-.sp-pony.nx{opacity:var(--mixp,0)}
-.sp-body{z-index:2}
-.sp-head{position:absolute;inset:0}
-/* 表情：フードの内側の「顔の穴」にだけ、別の顔をはめ込む。
-   穴の形に合わせて焼いてあるので、縁は元の絵のまま＝継ぎ目が出ない */
-.face{
-  position:absolute;display:none;
-  left:var(--fx,20%); top:var(--fy,25%);
-  width:54.63%; height:41.97%;
-  background-size:700% 1700%;
+.rigbox .tt,.rigbox .hh{position:absolute;left:0;top:0;width:432px;height:550px;will-change:transform}
+.rigbox i.pt{
+  position:absolute;display:block;
   background-repeat:no-repeat;
+  will-change:transform;
+  backface-visibility:hidden;
 }
-.face.on{display:block}
-/* 頭とアクセを同じ層に入れて、まとめて揺らす */
-.head-layer{position:absolute;inset:0;z-index:3;will-change:transform;
-  transform-origin:var(--hx2,45%) var(--hy2,70%)}
+.avatar-wrap[data-shape="chubby"] .rigbox{--fat:1}
 @keyframes sh{0%,100%{transform:translateX(-50%) scale(1);opacity:.16}
               47%{transform:translateX(-50%) scale(.78);opacity:.08}}
 
@@ -355,8 +333,8 @@ body{
 
 /* アクセサリー（ポーズごとの頭の位置に追従） */
 .acc{
-  position:absolute;pointer-events:none;
-  left:var(--hx,48%);top:var(--hy,16%);
+  position:absolute;pointer-events:none;z-index:4;
+  left:var(--hx,46%);top:var(--hy,11%);
   width:var(--aw,28%);
   transform:translate(calc(-50% + var(--ax,0%)),calc(-50% + var(--ay,0%)));
   filter:drop-shadow(0 2px 1px rgba(74,34,51,.18));
@@ -776,18 +754,10 @@ body{
         <div class="av-grow" id="avGrow">
           <div class="aura" aria-hidden="true"></div>
           <div class="body" id="body">
-            <div class="pony-layer" id="ponyL" aria-hidden="true">
-              <div class="sprite sp-pony" id="spPony"></div>
-              <div class="sprite sp-pony nx" id="spPony2"></div>
+            <div class="rig" id="rig" role="img" aria-label="なるねぇ">
+              <div class="rigbox" id="rigBox"></div>
             </div>
-            <div class="sprite sp-body" id="spBody" role="img" aria-label="なるねぇ"></div>
-            <div class="sprite sp-body nx" id="spBody2" aria-hidden="true"></div>
-            <div class="head-layer" id="headL">
-              <div class="sprite sp-head" id="spHead" aria-hidden="true"></div>
-              <div class="sprite sp-head nx" id="spHead2" aria-hidden="true"></div>
-              <div class="face" id="spFace" aria-hidden="true"></div>
-              <div class="acc" id="acc" aria-hidden="true"></div>
-            </div>
+            <div class="acc" id="acc" aria-hidden="true"></div>
             <svg class="stinkLines" viewBox="0 0 40 40" aria-hidden="true">
               <path d="M6 34c6-8-2-12 4-20M18 36c6-8-2-12 4-20M30 34c6-8-2-12 4-20" fill="none" stroke="#8C7A50" stroke-width="3" stroke-linecap="round"/>
             </svg>
@@ -1129,8 +1099,7 @@ var LINES = {
 var $ = function(id){ return document.getElementById(id); };
 var bubble=$("bubble"), wrap=$("avatarWrap"), stage=$("stage"),
     sheet=$("sheet"), sheetInner=$("sheetInner"), toastEl=$("toast"),
-    floatEl=$("avFloat"), growEl=$("avGrow"), bodyEl=$("body"), spriteEl=$("spBody"), spPony=$("spPony"), spHead=$("spHead"), headL=$("headL"), spFace=$("spFace"),
-    spBody2=$("spBody2"), spHead2=$("spHead2"), spPony2=$("spPony2"), ponyL=$("ponyL"), accEl=$("acc"), eggEl=$("egg");
+    floatEl=$("avFloat"), growEl=$("avGrow"), bodyEl=$("body"), accEl=$("acc"), eggEl=$("egg");
 var REDUCED = !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
 
 /* ============================================================
@@ -1204,109 +1173,142 @@ function showTag(text, evo){
 }
 
 /* ============================================================
-   6. ポーズ・アクション（スプライト）
+   6. 骨組み（切り絵リグ）
+   ------------------------------------------------------------
+   絵はもうコマ送りしない。1枚のアトラスから切り出した15個のパーツを
+   関節でつないで、角度を毎フレーム計算して動かす。
+   だから「コマ数」という概念自体がなくなって、どんな速度でも滑らか。
    ============================================================ */
-// スプライトシート上の位置（4列×3行）と、そのポーズでの頭の位置（アクセの取り付け座標）
-var POSE = {jump:0, cheer:1, dance:2, clap:3, kiss:4, thanks:5, yay:6, hmm:7, run:8, sorry:9, win:10, sleep:11,
-            br0:12, br1:13, br2:14, br3:15, br4:16, br5:17, br6:18, br7:19,
-            dn0:20, dn1:21, dn2:22, dn3:23, dn4:24, dn5:25, dn6:26, dn7:27, dn8:28, dn9:29, dn10:30, dn11:31,
-            rn0:32, rn1:33, rn2:34, rn3:35, rn4:36, rn5:37, rn6:38, rn7:39,
-            jp0:40, jp1:41, jp2:42, jp3:43, jp4:44, jp5:45, jp6:46, jp7:47};
-// 表情を差し替えられるポーズと、その顔の穴の位置（%）
-// 手が顔にかかる kiss / hmm / sleep は、元の顔のまま使う
-var FACEROW = {br0:0, br1:1, br2:2, br3:3, br4:4, br5:5, br6:6, br7:7, jump:8, cheer:9, dance:10, clap:11, thanks:12, yay:13, run:14, sorry:15, win:16};
-var FACEBOX = {br0:[21.3,31.3], br1:[21.6,31.8], br2:[20.4,32.4], br3:[20.7,36.1], br4:[21.6,31.8], br5:[21.6,31], br6:[21.6,30.7], br7:[21.6,31.8], jump:[26.9,27], cheer:[18.5,21.7], dance:[20.1,23.7], clap:[18.5,29.6], thanks:[21.6,34.9], yay:[18.2,23.4], run:[14.2,32.4], sorry:[21.9,33.2], win:[17.3,26.8]};
-// base（素の顔）はこの層を出さないことで表す
-var EXPRI = {soft:0, squint:1, half:2, close:3, wow:4, sad:5, smirk:6};
+var ATLAS = {"cw":432.0,"ch":549.45,"aw":1024,"ah":439,"piv":{"head":[182.7,311.4],"pony":[258.3,108.9],"armL":[80.55,351.9],"armR":[277.2,352.35],"legL":[114.3,459.9],"legR":[243.9,459.9],"torso":[179.1,459.45]},"parts":[{"n":"pony","ax":0,"ay":0,"w":193,"h":128,"ox":239.4,"oy":0.0},{"n":"armL","ax":195,"ay":0,"w":83,"h":72,"ox":7.2,"oy":341.55},{"n":"armR","ax":280,"ay":0,"w":86,"h":73,"ox":268.2,"oy":341.55},{"n":"legL","ax":368,"ay":0,"w":85,"h":93,"ox":72.45,"oy":456.3},{"n":"legR","ax":455,"ay":0,"w":85,"h":93,"ox":201.6,"oy":456.3},{"n":"torso","ax":542,"ay":0,"w":224,"h":153,"ox":67.5,"oy":312.3},{"n":"face","ax":0,"ay":155,"w":333,"h":217,"ox":13.05,"oy":109.35},{"n":"hood","ax":335,"ay":155,"w":367,"h":176,"ox":0.0,"oy":40.95},{"n":"blushL","ax":704,"ay":155,"w":54,"h":33,"ox":57.6,"oy":224.1},{"n":"blushR","ax":760,"ay":155,"w":53,"h":32,"ox":250.2,"oy":221.85},{"n":"browL","ax":815,"ay":155,"w":55,"h":19,"ox":98.55,"oy":169.2},{"n":"browR","ax":872,"ay":155,"w":60,"h":27,"ox":205.2,"oy":161.55},{"n":"eyeL","ax":934,"ay":155,"w":58,"h":14,"ox":87.3,"oy":202.95},{"n":"eyeR","ax":0,"ay":374,"w":57,"h":15,"ox":213.75,"oy":200.7},{"n":"mouth","ax":59,"ay":374,"w":80,"h":63,"ox":142.2,"oy":217.35}]};
+var SPRITE_SRC = "naru.webp?v=9dadb705";
 
-// 層ごとの回転の中心（%）。[頭のx, 頭のy, ポニテのx, ポニテのy]
-var RIG = [[49.9,72.2,60.2,17.2], [43.1,69.2,57.1,13.8], [40.3,64.2,42.6,13.5], [41,73,56.5,20],
-           [31.2,79.5,60.2,37.2], [43.6,66.3,51.2,16.9], [40,70.4,46.9,14.1], [47.3,58.8,50.3,7.9],
-           [38.8,79.1,50.3,22], [47.1,69.6,57.1,20], [41.2,78,47.8,16.3], [40.6,65.5,45.1,6.2],
-           [45.9,80.3,55.6,22.5], [46.3,77.9,55.9,22.8], [45.9,80.9,56.2,23.4], [46.1,82.4,55.2,26.2],
-           [46,79.1,57.1,23.4], [45.6,75.2,56.2,22.5], [45.6,72.6,55.9,22], [45.7,80.1,56.2,22.8],
-           [46.2,80.9,56.8,22.5], [41.8,78.6,53.7,22.5], [42.9,74.4,54.6,22.5], [46,75.6,59.9,23.7],
-           [44.6,80.7,55.2,23.1], [43.7,73.4,54,23.1], [52.2,76.6,42,23.1], [51.8,74.6,42.6,22.5],
-           [46.6,91.3,58,22], [52.1,79.5,39.2,24.5], [43.3,75.4,54.3,23.1], [43,82,54,23.1],
-           [46.1,73.4,55.6,18.9], [47,79.1,56.2,22.8], [45.7,73.2,55.2,16.9], [45.7,72.4,56.2,15.5],
-           [46.4,74.2,56.2,20], [46.8,79.8,56.2,23.7], [46.1,72.7,55.6,17.7], [45.5,73.5,54.6,16.3],
-           [48.1,65.3,58,19.2], [42.4,79.5,52.5,31.8], [43.6,69.6,53.1,16.1], [43.8,64.8,52.2,13],
-           [50,68.3,62,19.4], [45.7,70.3,57.1,20.6], [43.7,86.9,53.4,33], [44.3,80.3,54.3,20.8]];
+// パーツのDOM。描画順＝この順（後ろのものほど手前）
+var PART_ORDER = ["pony","legL","legR","armL","armR","torso","face","hood",
+                  "blushL","blushR","browL","browR","eyeL","eyeR","mouth"];
+var PT = {}, rigBox = null, ttA,ttB,ttC,ttD, hhA, hhD;
 
-var HEAD = [[50,18], [42,11], [44,13], [42,19], [32,26], [46,28], [44,14], [53,9], [38,23], [49,24], [44,17], [45,2], [46,23], [46,24], [46,24], [46,28], [46,24], [46,23], [46,23], [46,24], [46,23], [43,23], [43,24], [46,23], [45,24], [44,25], [51,25], [51,25], [45,21], [52,24], [44,24], [43,23], [44,20], [46,25], [44,18], [44,16], [44,21], [45,26], [44,19], [44,17], [48,20], [43,35], [44,16], [44,12], [49,17], [46,22], [44,35], [44,21]];
-/* ---- 表情 ----------------------------------------------------
-   目は開かないキャラなので、まばたきの代わりに「目の弧の強弱」で
-   顔がピクッと動く合図を作る。喋っている間は口を開け閉めする。 */
-var FACE_SRC = "face.webp?v=d99e0e8a";
-var faceRow = -1, faceNow = "base", faceBase = "base", faceHold = 0, flapTimer = null, blinkTimer = null;
+function buildRig(){
+  var host = $("rig"); if(!host) return;
+  rigBox = $("rigBox");
+  rigBox.style.width = ATLAS.cw+"px";
+  rigBox.style.height = ATLAS.ch+"px";
+  var map = {}; ATLAS.parts.forEach(function(p){ map[p.n] = p; });
+  function mk(n, piv){
+    var p = map[n]; if(!p) return null;
+    var e = document.createElement("i");
+    e.className = "pt";
+    e.style.cssText = "left:"+p.ox+"px;top:"+p.oy+"px;width:"+p.w+"px;height:"+p.h+"px;"+
+      "background-position:"+(-p.ax)+"px "+(-p.ay)+"px;background-size:"+ATLAS.aw+"px "+ATLAS.ah+"px";
+    if(piv) e.style.transformOrigin = (ATLAS.piv[piv][0]-p.ox)+"px "+(ATLAS.piv[piv][1]-p.oy)+"px";
+    PT[n] = e; return e;
+  }
+  function layer(cls, piv){
+    var g = document.createElement("div"); g.className = cls;
+    if(piv) g.style.transformOrigin = ATLAS.piv[piv][0]+"px "+ATLAS.piv[piv][1]+"px";
+    return g;
+  }
+  // 胴の層は4枚に分ける。ポニテを頭と一緒に回しつつ、体の後ろに描くため
+  ttA = layer("tt","torso"); hhA = layer("hh","head"); ttA.appendChild(hhA);
+  hhA.appendChild(mk("pony","pony")); rigBox.appendChild(ttA);
+  rigBox.appendChild(mk("legL","legL")); rigBox.appendChild(mk("legR","legR"));
+  ttB = layer("tt","torso"); ttB.appendChild(mk("armL","armL")); ttB.appendChild(mk("armR","armR"));
+  rigBox.appendChild(ttB);
+  ttC = layer("tt","torso"); ttC.appendChild(mk("torso","torso")); rigBox.appendChild(ttC);
+  ttD = layer("tt","torso"); hhD = layer("hh","head"); ttD.appendChild(hhD); rigBox.appendChild(ttD);
+  ["face","hood","blushL","blushR","browL","browR","eyeL","eyeR","mouth"].forEach(function(n){
+    var e = mk(n); if(e) hhD.appendChild(e);
+  });
+  hhD.appendChild(accEl);
+  fitRig();
+  applyOutfit();
+}
+// 表示サイズに合わせて縮尺を合わせる（リグの中身は常に 432×549 で考える）
+// たまごの間は非表示で幅が測れないので、表示されたときにも測り直す
+function fitRig(){
+  if(!rigBox) return;
+  var w = bodyEl.clientWidth;
+  if(!w) return;
+  rigBox.style.setProperty("--rk", (w/ATLAS.cw).toFixed(5));
+  rigBox.style.setProperty("--rdx", (ATLAS.cw/2 - ATLAS.piv.torso[0]).toFixed(2)+"px");
+}
+window.addEventListener("resize", fitRig);
+if(window.ResizeObserver) new ResizeObserver(fitRig).observe($("body"));
 
-function paintFace(){
-  if(faceRow < 0 || EXPRI[faceNow] == null){ spFace.classList.remove("on"); return; }
-  spFace.style.backgroundPosition =
-    (EXPRI[faceNow]/6*100).toFixed(3)+"% "+(faceRow/16*100).toFixed(3)+"%";
-  spFace.classList.add("on");
-}
-function setFace(name, holdMs){
-  faceNow = (EXPRI[name] == null) ? "base" : name;
-  paintFace();
-  if(holdMs) faceHold = (window.performance ? performance.now() : Date.now()) + holdMs;
-}
-// 状態から決まる“素の表情”
-function baseFace(){
-  if(S.mood < 30 || S.energy < 20) return "sad";
-  return "base";
-}
-function syncFace(){
-  var b = baseFace();
-  if(b !== faceBase){ faceBase = b; if(!faceHold && !flapTimer) setFace(b); }
-}
-// 喋っている間の口パク
-function startFlap(){
-  stopFlap();
-  var seq = ["close","half","base","half","close","half"], k = 0;   // 口の開き方に強弱をつける
-  flapTimer = setInterval(function(){ if(!faceHold) setFace(seq[k++ % seq.length]); }, 105);
-}
-function stopFlap(){
-  if(flapTimer){ clearInterval(flapTimer); flapTimer = null; if(!faceHold) setFace(faceBase); }
-}
-// まばたきの代わり：たまに目をギュッと細める
-function blinkLoop(){
-  blinkTimer = setTimeout(function(){
-    if(faceRow >= 0 && !faceHold && !flapTimer && !document.hidden && faceNow === faceBase){
-      setFace("soft");
-      setTimeout(function(){ if(!faceHold && !flapTimer) setFace("squint"); }, 85);
-      setTimeout(function(){ if(!faceHold && !flapTimer) setFace(faceBase); }, 215);
-    }
-    blinkLoop();
-  }, 2200 + Math.random()*3800);
-}
-
-/* ---- パーツを別々に揺らす ----------------------------------------
-   頭は体のあとを追い、ポニーテールはさらに頭のあとを追う。
-   「遅れて」「行きすぎて」「戻る」——これが動画に見える正体なので、
-   位置ではなく“ばね”で解く。数値は見た目で詰めたもの。 */
-function Spring(k, d){ this.x=0; this.v=0; this.k=k; this.d=d; }
-Spring.prototype.step = function(target, dt){
-  this.v += ((target - this.x)*this.k - this.v*this.d) * dt;
-  this.x += this.v * dt;
-  return this.x;
+/* ---- ポーズ＝関節の角度 -------------------------------------
+   al/ar＝腕、ll/lr＝脚、tr＝胴のひねり、hr＝首、ty/hy＝沈み込み、
+   rx/ry＝体ごとの移動、sq＝つぶれ具合。全部ばねで追うので、
+   ポーズを切り替えるだけで“間”が勝手に生まれる。 */
+var Z = {al:0,ar:0,ll:0,lr:0,tr:0,ty:0,hr:0,hy:0,rx:0,ry:0,sq:1};
+var JKEYS = ["al","ar","ll","lr","tr","ty","hr","hy","rx","ry","sq"];
+var POSE = {
+  // 腕は「＋で外へ上がる」。頭が大きいので、上げても100度くらいが限界
+  thanks:{al:14, ar:-14, hr:2},
+  cheer: {al:80, ar:-80, hr:-2, ry:-4, sq:1.015},
+  yay:   {al:94, ar:-94, hr:3, ry:-7, sq:1.02},
+  jump:  {al:90, ar:-90, ry:-30, ll:-12, lr:12, sq:1.04},
+  dance: {al:66, ar:-26, tr:8, hr:-11, rx:7, ll:6, lr:6, ry:-3},
+  clap:  {al:30, ar:-30, hr:1, ty:-1},
+  kiss:  {al:92, ar:-12, hr:7, ty:-1},
+  hmm:   {hr:-14, al:80, ar:-8, tr:-3},
+  run:   {al:26, ar:-48, ll:-22, lr:22, tr:5, hr:-3, ry:-4},
+  sorry: {tr:14, hr:10, al:-10, ar:10, ry:6, sq:.985},
+  win:   {al:6, ar:-96, hr:-5, ry:-4},
+  sleep: {hr:17, tr:5, al:-8, ar:8, ry:7, sq:.97}
 };
-/* ---- 連番アニメの再生 ------------------------------------------
-   描き起こした連番（待機・ダンス・走る・ジャンプ）を、時間から
-   コマ番号を計算して送る。ばねと同じ時計を使うので位相がズレない。 */
-// pony:1 は「ポニーテールもコマ間を混ぜてよい」＝動きが小さい連番
-var CYC = { br:{n:8,  per:1.35, loop:1, pony:1},   // 待機（呼吸）
-            dn:{n:12, per:1.07, loop:1, pony:0},   // ダンス（2拍で1周）
-            rn:{n:8,  per:0.62, loop:1, pony:0},   // 走る
-            jp:{n:8,  per:0.90, loop:0, pony:0} }; // ジャンプ（1回だけ）
-var cycName = null, cycT0 = 0, cycFrame = -1, cycEnd = 0;
+function poseOf(name){
+  var p = POSE[name] || POSE.thanks, o = {};
+  for(var i=0;i<JKEYS.length;i++){ var k=JKEYS[i]; o[k] = (p[k]==null ? Z[k] : p[k]); }
+  return o;
+}
+
+/* ---- ループ＝時間の関数。コマではなく式で書く ------------------ */
+var TAU = 6.283185307;
+var CYC = {
+  br:{per:2.60, loop:1},   // 待機（呼吸）
+  dn:{per:0.58, loop:1},   // ダンス
+  rn:{per:0.42, loop:1},   // 走る
+  jp:{per:0.95, loop:0}    // ジャンプ（1回）
+};
+var CYCF = {
+  br:function(t,a,amp){
+    var p = t/CYC.br.per*TAU;
+    a.ty = -1.7*Math.sin(p)*amp; a.tr = 1.2*Math.sin(p*.5)*amp;
+    a.sq = 1 + .013*Math.sin(p)*amp;
+    a.hr = 1.7*Math.sin(p*.5+.5)*amp; a.hy = -1.1*Math.sin(p)*amp;
+    a.al = 14 + 5*Math.sin(p+.6)*amp; a.ar = -14 - 5*Math.sin(p+.6)*amp;
+    a.ry = -1.3*Math.sin(p)*amp;
+  },
+  dn:function(t,a){
+    var p = t/CYC.dn.per*TAU, s = Math.sin(p), c = Math.cos(p);
+    a.rx = 9*s; a.ry = -7*Math.abs(c)+3; a.tr = 7*s; a.hr = -10*s;
+    a.al = 58-26*s; a.ar = -58+26*s;
+    a.ll = 9*s; a.lr = 9*s; a.sq = 1+.03*Math.abs(c); a.hy = -2*Math.abs(c);
+  },
+  rn:function(t,a){
+    var p = t/CYC.rn.per*TAU, s = Math.sin(p), c = Math.cos(p);
+    a.ry = -9*Math.abs(s); a.rx = 2*s;
+    a.tr = 5+3*c; a.hr = -3-2*c;
+    a.al = 10+38*s; a.ar = -10+38*s;
+    a.ll = -36*s; a.lr = 36*s; a.sq = 1+.02*Math.abs(c);
+  },
+  jp:function(t,a){
+    var x = Math.min(1, t/CYC.jp.per), cr = 0, air = 0, la = 0;
+    if(x < .18) cr = Math.sin(x/.18*Math.PI/2);
+    else if(x < .82){ air = Math.sin((x-.18)/.64*Math.PI); }
+    else la = 1-(x-.82)/.18;
+    a.ry = -118*air + 14*cr + 10*la;
+    a.sq = 1 - .10*cr + .06*air - .08*la;
+    a.al = 92*air - 22*cr; a.ar = -92*air + 22*cr;
+    a.ll = -18*air + 16*cr; a.lr = 18*air + 16*cr;
+    a.tr = -3*air; a.hr = 4*air;
+  }
+};
+var cycName = null, cycT0 = 0, cycEnd = 0;
 function playCycle(name, dur){
   if(REDUCED || !CYC[name]) return;
-  cycName = name; cycT0 = rigT; cycFrame = -1;
-  cycEnd = dur ? rigT + dur : 0;
+  cycName = name; cycT0 = rigT; cycEnd = dur ? rigT + dur : 0;
 }
-function stopCycle(){ cycName = null; cycFrame = -1; cycEnd = 0; nextIdx = -1; setMix(0); }
-// 何もしていないときは呼吸ループ。寝ているときは静止ポーズに戻す
+function stopCycle(){ cycName = null; cycEnd = 0; }
 function wantBreathe(){
   if(REDUCED || dancing || actTimer || S.stage === 0) return false;
   var h = new Date().getHours();
@@ -1314,21 +1316,108 @@ function wantBreathe(){
   return true;
 }
 function tickBreathe(){
-  if(cycName && cycName !== "br") return;      // 他の連番を再生中なら触らない
+  if(cycName && cycName !== "br") return;
   var w = wantBreathe();
   if(w && cycName !== "br") playCycle("br");
-  else if(!w && cycName === "br"){ stopCycle(); setPose(idlePose()); }
+  else if(!w && cycName === "br") stopCycle();
 }
-var sHeadR = new Spring(150, 15),   // 頭の傾き
-    sHeadY = new Spring(190, 17),   // 頭の上下
-    sPony  = new Spring(78, 6.4),   // ポニーテール（いちばん柔らかく＝よく遅れる）
-    rigT = 0, rigLast = 0, rigRaf = 0, rigKick = 0;
 
-function kickRig(power){          // 動きだしの勢いを注入する
-  sPony.v  += 62 * power * (Math.random() < 0.5 ? -1 : 1);
-  sHeadR.v += 12 * power;
+/* ---- 表情も絵ではなく数値 --------------------------------------
+   目・眉・口・ほっぺは独立したパーツなので、動かすだけで表情になる。
+   [dx, dy, 回転, 横の倍率, 縦の倍率] */
+var EXPR = {
+  base:  {},
+  soft:  {bl:[0,-3,0], br:[0,-3,0], el:[0,-1,0,1,.82], er:[0,-1,0,1,.82], mo:[0,0,0,.96,.86]},
+  squint:{bl:[0,3,0],  br:[0,3,0],  el:[0,1,0,1.06,.45], er:[0,1,0,1.06,.45], mo:[0,1,0,.9,.6]},
+  half:  {mo:[0,1,0,.96,.55]},
+  close: {mo:[0,3,0,.66,.28]},
+  wow:   {bl:[0,-7,0], br:[0,-7,0], el:[0,-2,0,1,1.15], er:[0,-2,0,1,1.15], mo:[0,2,0,1.12,1.38], bs:1.12},
+  sad:   {bl:[0,2,-9], br:[0,2,9],  el:[0,1,0,1,.9], er:[0,1,0,1,.9], mo:[0,4,0,.72,.42]},
+  smirk: {bl:[0,-4,-7], br:[0,0,-2], el:[0,0,0,1,.9], er:[0,0,0,1,.9], mo:[5,1,-7,.92,.8], bs:1.08}
+};
+var EK = ["bl","br","el","er","mo"];
+var EMAP = {bl:"browL", br:"browR", el:"eyeL", er:"eyeR", mo:"mouth"};
+var faceNow = "base", faceBase = "base", faceHold = 0;
+var eCur = {}, eTgt = {};
+EK.forEach(function(k){ eCur[k] = [0,0,0,1,1]; eTgt[k] = [0,0,0,1,1]; });
+eCur.bs = eTgt.bs = 1;
+
+function setFace(name, holdMs){
+  faceNow = EXPR[name] ? name : "base";
+  var e = EXPR[faceNow];
+  EK.forEach(function(k){
+    var v = e[k] || [0,0,0,1,1];
+    eTgt[k] = [v[0]||0, v[1]||0, v[2]||0, v[3]==null?1:v[3], v[4]==null?1:v[4]];
+  });
+  eTgt.bs = e.bs || 1;
+  if(holdMs) faceHold = (window.performance ? performance.now() : Date.now()) + holdMs;
+}
+function baseFace(){
+  if(S.mood < 30 || S.energy < 20) return "sad";
+  return "base";
+}
+function syncFace(){
+  var b = baseFace();
+  if(b !== faceBase){ faceBase = b; if(!faceHold && !flap) setFace(b); }
+}
+// 喋っている間の口パク。タイマーではなく連続値なので、途切れない
+var flap = 0, flapV = 0, flapT = 0;
+function startFlap(){ flap = 1; flapT = rigT; }
+function stopFlap(){ flap = 0; }
+// まばたきの代わり：たまに目をギュッと細める（目は開かないキャラなので）
+var blinkTimer = null;
+function blinkLoop(){
+  blinkTimer = setTimeout(function(){
+    if(!faceHold && !flap && !document.hidden && faceNow === faceBase){
+      setFace("soft");
+      setTimeout(function(){ if(!faceHold && !flap) setFace("squint"); }, 85);
+      setTimeout(function(){ if(!faceHold && !flap) setFace(faceBase); }, 215);
+    }
+    blinkLoop();
+  }, 2200 + Math.random()*3800);
+}
+
+/* ---- ばね ------------------------------------------------------
+   目標の角度に「遅れて」「行きすぎて」「戻る」。
+   これが動画に見える正体なので、位置ではなくばねで解く。 */
+function Spring(k, d){ this.x=0; this.v=0; this.k=k; this.d=d; }
+Spring.prototype.step = function(target, dt){
+  this.v += ((target - this.x)*this.k - this.v*this.d) * dt;
+  this.x += this.v * dt;
+  return this.x;
+};
+var JS_ = {};
+JKEYS.forEach(function(k){
+  // 手足は速く、胴と首は少し柔らかく。ポニテだけ別（いちばん遅れる）
+  JS_[k] = (k==="hr"||k==="hy") ? new Spring(520,38)
+         : (k==="tr"||k==="ty") ? new Spring(600,40)
+         : new Spring(760,46);
+});
+JS_.sq.x = 1;
+var sPony = new Spring(120, 8.4), sPonyY = new Spring(150, 15);
+var rigT = 0, rigLast = 0, rigRaf = 0, rigKick = 0;
+var poseNow = "thanks";
+
+function kickRig(power){
+  sPony.v  += 70 * power * (Math.random() < 0.5 ? -1 : 1);
+  JS_.hr.v += 16 * power;
   rigKick = Math.min(1.4, rigKick + 0.4*power);
 }
+function setPose(name, quiet){
+  if(!POSE[name]) return;
+  var changed = poseNow !== name;
+  poseNow = name;
+  if(changed && !quiet) kickRig(0.35);
+}
+function idlePose(){
+  var h = new Date().getHours();
+  if(S.energy < 20 || h < 5) return "sleep";
+  if(S.mood < 30) return "sorry";
+  if(S.shape === "toomuch") return "hmm";
+  if(S.shape === "chubby") return "thanks";
+  return S.mood > 70 ? "cheer" : "thanks";
+}
+
 function rigLoop(ts){
   rigRaf = requestAnimationFrame(rigLoop);
   var dt = rigLast ? Math.min(0.045, (ts - rigLast)/1000) : 0.016;
@@ -1337,96 +1426,53 @@ function rigLoop(ts){
   rigT += dt;
   rigKick *= Math.pow(0.28, dt);
   tickBreathe();
-  if(faceHold && ts > faceHold){ faceHold = 0; if(!flapTimer) setFace(faceBase); }
-  var lively = dancing ? 2.6 : (S.energy < 22 ? 0.35 : S.mood < 30 ? 0.6 : 1);
-  var amp = lively + rigKick;
-  var t = rigT;
-  // 待機中は描き起こした8コマを送る。それ以外は同じ動きを拡大縮小で作る
-  // （実測で 幅×1.00 / 高さ×0.94 の純粋な沈み込みだったので、その値を使う）
-  var br, playing = false;
+  if(faceHold && ts > faceHold){ faceHold = 0; if(!flap) setFace(faceBase); }
+  var lively = dancing ? 1.9 : (S.energy < 22 ? 0.45 : S.mood < 30 ? 0.7 : 1);
+  var amp = Math.min(2.2, lively + rigKick);
+
+  // 1) 目標の姿勢を決める
+  var a = poseOf(poseNow);
   if(cycName){
-    var c = CYC[cycName], e = t - cycT0, ph = e / c.per;
-    if(cycEnd && t > cycEnd){ stopCycle(); }
-    else if(!c.loop && ph >= 1){ stopCycle(); }
-    else{
-      playing = true;
-      var fpos = ph * c.n;
-      var fi = c.loop ? (Math.floor(fpos) % c.n) : Math.min(c.n-1, Math.floor(fpos));
-      var fn = c.loop ? ((fi+1) % c.n) : Math.min(c.n-1, fi+1);
-      var ft = fpos - Math.floor(fpos);
-      if(fi !== cycFrame){ cycFrame = fi; setPose(cycName + fi, true); }
-      setNext(cycName + fn);
-      setMix(ft*ft*(3-2*ft), c.pony);   // なめらかに立ち上げる（急に混ざらない）
-      bodyEl.style.transform = "";      // 動きはコマ側が持っているので二重にかけない
-      br = (1 - Math.cos((ph % 1) * 6.28318)) / 2;
-    }
+    var c = CYC[cycName], e = rigT - cycT0;
+    if((cycEnd && rigT > cycEnd) || (!c.loop && e >= c.per)) stopCycle();
+    else CYCF[cycName](e, a, cycName === "br" ? amp : 1);
   }
-  if(!playing){
-    setMix(0);
-    var per = dancing ? 0.62 : 2.35;
-    br = (1 - Math.cos((t % per) / per * 6.28318)) / 2;
-    var d = 0.060 * (0.75 + 0.25*Math.min(3, amp));
-    bodyEl.style.transform = "scale("+(1+d*0.15*br).toFixed(4)+","+(1-d*br).toFixed(4)+")";
-  }
-  // 頭は体の沈みを遅れて追う。ばねなので勝手に「行きすぎて戻る」
-  var tr = Math.sin(t*1.75) * 0.85 * amp + Math.sin(t*0.61) * 0.45;
-  var ty = br * 3.4 * Math.min(1.8, amp) + Math.sin(t*2.55 + 0.8) * 0.8 * amp;
-  var hr = sHeadR.step(tr, dt);
-  var hy = sHeadY.step(ty, dt);
+  // 2) ばねで追う（ここで“間”と“行きすぎ”が生まれる）
+  var v = {};
+  for(var i=0;i<JKEYS.length;i++){ var k = JKEYS[i]; v[k] = JS_[k].step(a[k], dt); }
+  // 3) 書き出す
+  var sq = v.sq;
+  bodyEl.style.transform = "translate3d("+v.rx.toFixed(2)+"px,"+v.ry.toFixed(2)+"px,0) scale("+
+    (1/sq).toFixed(4)+","+sq.toFixed(4)+")";
+  var tt = "translate(0,"+v.ty.toFixed(2)+"px) rotate("+v.tr.toFixed(2)+"deg)";
+  var hh = "translate(0,"+v.hy.toFixed(2)+"px) rotate("+v.hr.toFixed(2)+"deg)";
+  ttA.style.transform = tt; ttB.style.transform = tt; ttC.style.transform = tt; ttD.style.transform = tt;
+  hhA.style.transform = hh; hhD.style.transform = hh;
   // ポニーテールは頭の“速さ”に引っぱられる（動いた方向と逆に流れる）
-  var pa = sPony.step(-(sHeadR.v*0.062 + sHeadY.v*0.155), dt);
-  pa = Math.max(-14, Math.min(14, pa));
-  headL.style.transform  = "translate3d(0,"+hy.toFixed(2)+"px,0) rotate("+hr.toFixed(2)+"deg)";
-  ponyL.style.transform  = "rotate("+pa.toFixed(2)+"deg)";
-  spriteEl.style.transform = "translate3d(0,"+(hy*0.22).toFixed(2)+"px,0) rotate("+(hr*0.3).toFixed(2)+"deg)";
-}
-
-function setPose(name, quiet){
-  var i = POSE[name]; if(i == null || !spriteEl) return;
-  var changed = spriteEl.getAttribute("data-pose") !== name;
-  var col = (i%4)*(100/3), row = Math.floor(i/4), U = 100/35;
-  // シートは4列×36行。0〜11行目が体、12〜23行目が頭、24〜35行目がポニーテール
-  spriteEl.style.backgroundPosition = col.toFixed(3)+"% "+(row*U).toFixed(3)+"%";
-  spHead.style.backgroundPosition   = col.toFixed(3)+"% "+((row+12)*U).toFixed(3)+"%";
-  spPony.style.backgroundPosition   = col.toFixed(3)+"% "+((row+24)*U).toFixed(3)+"%";
-  var g = RIG[i];
-  headL.style.setProperty("--hx2", g[0]+"%"); headL.style.setProperty("--hy2", g[1]+"%");
-  var fr = FACEROW[name];
-  faceRow = (fr == null) ? -1 : fr;
-  if(faceRow >= 0){
-    spFace.style.setProperty("--fx", FACEBOX[name][0]+"%");
-    spFace.style.setProperty("--fy", FACEBOX[name][1]+"%");
+  var pa = sPony.step(-(JS_.hr.v*0.052 + JS_.tr.v*0.030 + JS_.ry.v*0.055), dt);
+  pa = Math.max(-26, Math.min(26, pa));
+  var py = sPonyY.step(v.ry*0.09, dt);
+  PT.pony.style.transform = "translate(0,"+py.toFixed(2)+"px) rotate("+pa.toFixed(2)+"deg)";
+  PT.armL.style.transform = "rotate("+v.al.toFixed(2)+"deg)";
+  PT.armR.style.transform = "rotate("+v.ar.toFixed(2)+"deg)";
+  PT.legL.style.transform = "rotate("+v.ll.toFixed(2)+"deg)";
+  PT.legR.style.transform = "rotate("+v.lr.toFixed(2)+"deg)";
+  // 4) 表情。こちらもなめらかに寄せる
+  var ez = 1 - Math.exp(-24*dt);
+  flapV += (flap - flapV) * (1 - Math.exp(-14*dt));   // 口パクの出入りも滑らかに
+  var mf = 0.5 - 0.5*Math.cos((rigT-flapT)*TAU*4.6);
+  for(var j=0;j<EK.length;j++){
+    var kk = EK[j], cv = eCur[kk], tv = eTgt[kk];
+    for(var m=0;m<5;m++) cv[m] += (tv[m]-cv[m])*ez;
+    var sy = cv[4], sx = cv[3];
+    if(kk === "mo" && flapV > 0.002) sy *= 1 - flapV*(0.72 - 0.72*mf);
+    PT[EMAP[kk]].style.transform =
+      "translate("+cv[0].toFixed(2)+"px,"+cv[1].toFixed(2)+"px) rotate("+cv[2].toFixed(2)+
+      "deg) scale("+sx.toFixed(3)+","+sy.toFixed(3)+")";
   }
-  paintFace();
-  ponyL.style.setProperty("--px",  g[2]+"%"); ponyL.style.setProperty("--py",  g[3]+"%");
-  if(changed && !quiet) kickRig(0.35);   // ポーズが切り替わった勢いを髪に伝える
-  spriteEl.setAttribute("data-pose", name);
-  accEl.style.setProperty("--hx", HEAD[i][0]+"%");
-  accEl.style.setProperty("--hy", HEAD[i][1]+"%");
-}
-// 補間用に「次のコマ」を裏で置いておく。表示は --mix で混ぜる
-var nextIdx = -1;
-function setNext(name){
-  var i = POSE[name]; if(i == null || i === nextIdx) return;
-  nextIdx = i;
-  var col = (i%4)*(100/3), row = Math.floor(i/4), U = 100/35;
-  spBody2.style.backgroundPosition = col.toFixed(3)+"% "+(row*U).toFixed(3)+"%";
-  spHead2.style.backgroundPosition = col.toFixed(3)+"% "+((row+12)*U).toFixed(3)+"%";
-  spPony2.style.backgroundPosition = col.toFixed(3)+"% "+((row+24)*U).toFixed(3)+"%";
-}
-function setMix(v, pony){
-  bodyEl.style.setProperty("--mix", v.toFixed(3));
-  bodyEl.style.setProperty("--mixp", (pony ? v : 0).toFixed(3));
-}
-
-// 何もしていないときに表示するポーズ（状態で変わる）
-function idlePose(){
-  var h = new Date().getHours();
-  if(S.energy < 20 || h < 5) return "sleep";
-  if(S.mood < 30) return "sorry";
-  if(S.shape === "toomuch") return "hmm";
-  if(S.shape === "chubby") return "thanks";
-  return S.mood > 70 ? "cheer" : "thanks";
+  eCur.bs += (eTgt.bs-eCur.bs)*ez;
+  var bs = "scale("+eCur.bs.toFixed(3)+")";
+  PT.blushL.style.transform = bs; PT.blushR.style.transform = bs;
 }
 
 // コマの並び／1コマの長さ／繰り返し回数／体の動き
@@ -1449,7 +1495,7 @@ var seqTimer = null, actTimer = null, dancing = false;
 
 var curAct="cheer";
 function playAct(name){
-  var a = ACT[name]; if(!a || !spriteEl || dancing) return;
+  var a = ACT[name]; if(!a || !rigBox || dancing) return;
   curAct = name;
   kickRig(name==="jump"||name==="dance"||name==="run" ? 2.2 : 1.3);
   if(seqTimer){ clearInterval(seqTimer); seqTimer=null; }
@@ -1544,13 +1590,14 @@ function applyLook(){
     accEl.style.setProperty("--aw", acc.aw); accEl.style.setProperty("--ax", acc.ax); accEl.style.setProperty("--ay", acc.ay);
   }else{ accEl.innerHTML=""; accEl.removeAttribute("data-id"); }
   $("closetNew").classList.toggle("on", !!S.closetNew);
+  fitRig();
   syncFace();
 }
 function accById(id){ for(var i=0;i<ACCS.length;i++) if(ACCS[i].id===id) return ACCS[i]; return ACCS[0]; }
 function outfitById(id){ for(var i=0;i<OUTFITS.length;i++) if(OUTFITS[i].id===id) return OUTFITS[i]; return OUTFITS[0]; }
 
 /* --- 服：スプライトの色替え（Canvas）。生成した画像はメモリに置くだけ --- */
-var SPRITE_SRC = "naru.webp?v=1919507a";
+var SPRITE_SRC = "naru.webp?v=9dadb705";
 var baseImg = null, baseData = null, spriteCache = {cheer:SPRITE_SRC};
 function hsl(r,g,b){
   r/=255;g/=255;b/=255;
@@ -1601,7 +1648,7 @@ function buildOutfit(id, cb){
         if(t){ var n=rgb(t[0],t[1],Math.min(.96,l*t[2]/base)); d[i]=n[0]; d[i+1]=n[1]; d[i+2]=n[2]; }
       }
       g.putImageData(id2,0,0);
-      spriteCache[id]=c.toDataURL("image/webp",0.86);   // PNGだと1枚1MB超えるのでWebPで持つ
+      spriteCache[id]=c.toDataURL("image/webp",0.92);
       cb(spriteCache[id]);
     }catch(e){ cb(SPRITE_SRC); }
   });
@@ -1609,8 +1656,7 @@ function buildOutfit(id, cb){
 function applyOutfit(){
   buildOutfit(S.outfit, function(url){
     var u = "url("+url+")";
-    spriteEl.style.backgroundImage = u; spHead.style.backgroundImage = u; spPony.style.backgroundImage = u;
-    spBody2.style.backgroundImage  = u; spHead2.style.backgroundImage = u; spPony2.style.backgroundImage = u;
+    for(var k in PT) PT[k].style.backgroundImage = u;
   });
 }
 
@@ -2261,8 +2307,8 @@ renderMess();
 setButtons();
 applyOutfit();
 save();
+buildRig();
 setPose(idlePose());
-spFace.style.backgroundImage = "url("+FACE_SRC+")";
 // 絵は別ファイルなので、置き場所がずれていたら気づけるようにしておく
 (function(){
   var probe = new Image();
@@ -2290,9 +2336,10 @@ setInterval(function(){
 // デバッグ用（テスト実行時に状態を確認するため）
 window.__naru={ get:function(){ return S; }, set:function(o){ Object.assign(S,o); render(); renderMess(); setButtons(); save(); },
   meal:doMeal, move:doMove, look:doLook, poke:pokeNaru, line:lookLine, lines:LINES, act:playAct, pose:setPose, idlePose:idlePose,
-  sprite:function(){return spriteEl.getAttribute("data-pose");}, render:render, face:setFace, mess:function(n){ spawnMess(n||1); renderMess(); save(); },
+  sprite:function(){return poseNow;}, render:render, face:setFace, mess:function(n){ spawnMess(n||1); renderMess(); save(); },
   clean:cleanMess, evolve:function(){ S.careDays=STAGES[Math.min(4,S.stage+1)].days; return checkEvolve(); }, hatch:hatch, egg:tapEgg,
   dance:startDance, endDance:endDance, danceState:function(){ return D; }, closet:sheetCloset, wear:function(o,a){ if(o) S.outfit=o; if(a) S.acc=a; applyOutfit(); render(); save(); },
+  arm:function(l,r){ POSE.__t={al:l,ar:r}; setPose("__t"); },
   unlockAll:function(){ OUTFITS.concat(ACCS).forEach(function(i){ S.unlocked[i.id]=1; }); save(); }, unlocks:checkUnlocks, outfits:OUTFITS, accs:ACCS, stages:STAGES, cache:spriteCache };
 
 })();
