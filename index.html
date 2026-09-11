@@ -179,10 +179,16 @@ body{
   background:linear-gradient(180deg,var(--base),rgba(255,255,255,0));
   transition:background 1.2s ease;
 }
-/* 散らかると部屋がくすむ */
-.stage[data-mess="3"]{filter:saturate(.94) brightness(.985)}
-.stage[data-mess="4"]{filter:saturate(.88) brightness(.97)}
-.stage[data-mess="5"]{filter:saturate(.82) brightness(.955)}
+/* 散らかっても部屋はくすませない。増えるのは「床のもの」だけ。
+   片付けを罰にしないため、暗くする・にごらせる類の演出は置かない */
+
+/* 全部片付いたときの光。1回だけ流れて消える。数値は動かさない */
+.shine{
+  position:absolute;inset:0;z-index:4;pointer-events:none;opacity:0;
+  background:radial-gradient(78% 54% at 50% 76%, rgba(255,255,255,.40) 0%, rgba(255,252,240,.16) 45%, rgba(255,255,255,0) 74%);
+}
+.stage.shine-on .shine{animation:shine 1.7s cubic-bezier(.25,.6,.3,1) 1}
+@keyframes shine{0%{opacity:0}28%{opacity:1}100%{opacity:0}}
 
 /* 窓・棚・クローゼット（小道具） */
 .window{
@@ -197,7 +203,7 @@ body{
 .stage[data-tod="morning"] .window{background:linear-gradient(180deg,#FFE7BE,#FFF7E8)}
 .stage[data-tod="night"] .window{background:linear-gradient(180deg,#2F3466,#4C5190)}
 .stage[data-tod="night"] .shelf .cap,.stage[data-tod="night"] .closet .cap{color:rgba(255,245,235,.72)}
-.shelf{position:absolute;bottom:29%;right:8px;width:76px;text-align:center;z-index:1}
+.shelf{position:absolute;bottom:29%;right:8px;width:76px;text-align:center;z-index:4}
 .shelf .plank{height:6px;background:#E9C4AE;border-radius:99px;box-shadow:var(--sh-1)}
 .shelf .jar{
   display:block;width:34px;height:auto;margin:0 auto 2px;cursor:pointer;
@@ -208,11 +214,14 @@ body{
 .shelf .cap{font-size:8px;font-weight:700;letter-spacing:.08em;color:var(--ink-2);display:block;margin-top:4px}
 
 .closet{
-  position:absolute;bottom:20%;left:12px;width:54px;height:74px;z-index:1;
+  position:absolute;bottom:20%;left:12px;width:54px;height:74px;z-index:4;
   cursor:pointer;border:0;background:none;padding:0;
   filter:drop-shadow(0 4px 3px rgba(74,34,51,.18));
   transition:transform .15s ease;
 }
+/* 見た目は変えずに、指の当たりだけ外へ広げる（下はラベルのぶんまで） */
+.closet::after{content:"";position:absolute;left:-12px;right:-10px;top:-12px;bottom:-20px}
+.shelf .jar::after{content:"";position:absolute;inset:-14px}
 .closet:active{transform:scale(.94)}
 .closet svg{width:100%;height:100%;display:block}
 .closet .cap{
@@ -229,7 +238,7 @@ body{
 
 /* 散らかりもの。キャラと同じ「太い黒線＋ベタ塗り」の線画にそろえる */
 .mess{
-  position:absolute;z-index:3;width:52px;height:52px;border:0;background:none;padding:0;
+  position:absolute;z-index:5;width:52px;height:52px;border:0;background:none;padding:0;
   cursor:pointer;
   filter:drop-shadow(0 3px 3px rgba(58,32,44,.22));
   transform:rotate(var(--rot,0deg)) scale(var(--ms,1));
@@ -240,8 +249,22 @@ body{
 .mess svg{width:100%;height:100%;display:block}
 @keyframes messin{from{transform:translateY(-40px) rotate(var(--rot,0deg)) scale(.4);opacity:0}}
 .mess:active{transform:rotate(var(--rot,0deg)) scale(calc(var(--ms,1) * .86))}
-.mess.gone{animation:messout .4s ease forwards;pointer-events:none}
-@keyframes messout{to{transform:rotate(200deg) scale(0);opacity:0}}
+.mess.gone{animation:messout .36s cubic-bezier(.3,1.6,.5,1) forwards;pointer-events:none}
+@keyframes messout{
+  0%  {transform:rotate(var(--rot,0deg)) scale(var(--ms,1));opacity:1}
+  35% {transform:rotate(var(--rot,0deg)) scale(calc(var(--ms,1) * 1.22));opacity:1}
+  100%{transform:rotate(var(--rot,0deg)) translateY(-10px) scale(calc(var(--ms,1) * .1));opacity:0}
+}
+/* 片付けた場所に出るポンッ */
+.puff{position:absolute;z-index:6;pointer-events:none;width:56px;height:56px;margin:-28px 0 0 -28px}
+.puff span{
+  position:absolute;left:50%;top:50%;width:9px;height:9px;margin:-4.5px;border-radius:50%;
+  background:#FFF;box-shadow:0 0 0 2.2px rgba(36,31,30,.85);
+  animation:puff .5s ease-out forwards;
+}
+@keyframes puff{0%{transform:translate(0,0) scale(.2);opacity:0}
+                25%{opacity:1}
+                100%{transform:translate(var(--px),var(--py)) scale(1);opacity:0}}
 .mess-hint{
   position:absolute;right:10px;top:116px;z-index:4;
   background:rgba(36,31,30,.72);color:#fff;border:0;border-radius:999px;
@@ -448,7 +471,8 @@ body{
 @keyframes rays{0%{opacity:0;transform:rotate(0)}20%{opacity:1}100%{opacity:0;transform:rotate(40deg)}}
 
 /* ふわっと上がるエフェクト文字 */
-.spark{position:absolute;z-index:6;pointer-events:none;font-size:14px;animation:spark 1s ease-out forwards}
+.spark{position:absolute;z-index:6;pointer-events:none;width:17px;height:17px;animation:spark 1s ease-out forwards}
+.spark svg{width:100%;height:100%;display:block}
 @keyframes spark{0%{opacity:0;transform:scale(.3)}25%{opacity:1}100%{opacity:0;transform:scale(1.25) translate(var(--dx),var(--dy)) rotate(35deg)}}
 .fx{position:absolute;z-index:6;font-family:var(--font-disp);font-weight:800;font-size:17px;pointer-events:none;animation:fx 1.1s ease-out forwards;white-space:nowrap}
 @keyframes fx{0%{opacity:0;transform:translateY(6px) scale(.8)}20%{opacity:1}100%{opacity:0;transform:translateY(-58px) scale(1.1)}}
@@ -805,6 +829,7 @@ body{
       <div class="lane" id="lane"><div class="line"></div><div class="ring" id="ring"></div></div>
     </div>
 
+    <div class="shine" aria-hidden="true"></div>
     <div class="evo-rays" id="evoRays" aria-hidden="true"></div>
     <div class="flash" id="flash" aria-hidden="true"></div>
     <div class="shape-tag" id="shapeTag"></div>
@@ -851,7 +876,7 @@ var store = {
 var DEF = {
   puni:52, mood:70, energy:80, beauty:65,
   weight:null, prevWeight:null,
-  streak:0, stamps:0, adCount:0,
+  streak:0, stamps:0, adCount:0, messDay:"", messToday:0,
   lastDay:null, lastTs:Date.now(),
   mealCount:0, moveCount:0, danceCount:0,
   shape:"natural", visits:0, lookRepeat:0,
@@ -946,9 +971,10 @@ var ACCS = [
 ];
 /* 床に落ちるもの。中身は assets/props.json（＋ assets/props/*.svg）が唯一の正で、
    build.py が画像ごとここに埋め込む。絵はキャラと同じ「太い黒線＋ベタ塗り」にそろえてある。 */
-var PROPS = [{"id":"snack","n":"お菓子の袋","svg":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\"><g stroke=\"#000\" stroke-width=\"3.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"><path d=\"M18 16l4 3 4-3 4 3 4-3 4 3 4-3v34l-4-3-4 3-4-3-4 3-4-3-4 3z\" fill=\"#FF9EB8\"/><path d=\"M18 27h28\" fill=\"none\" stroke-width=\"2.8\" stroke=\"#E0658A\"/><path d=\"M18 38h28\" fill=\"none\" stroke-width=\"2.8\" stroke=\"#E0658A\"/></g></svg>","pos":{"side":"any","y":[4,15],"rot":[-22,22],"scale":1.0},"say":["あ、それ食べた。おいしかった！","ありがと〜、ちゃんと捨てるね","お菓子はね、責めない。楽しかったならヨシ！"]},{"id":"shirt","n":"脱ぎっぱなしの服","svg":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\"><g fill=\"#FDCB23\" stroke=\"#000\" stroke-width=\"3.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"><path d=\"M24 16l-13 7 5 9 6-3v19h24V29l6 3 5-9-13-7z\"/><path d=\"M24 16c1.6 4.4 14.4 4.4 16 0\" fill=\"none\"/></g></svg>","pos":{"side":"any","y":[3,12],"rot":[-30,30],"scale":1.05},"say":["たたむの、あとでいいかなって思ってた","ありがと！部屋がすっとした","これ着心地よくてさ〜"]},{"id":"bottle","n":"ペットボトル","svg":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\"><g stroke=\"#000\" stroke-width=\"3.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"><rect x=\"26\" y=\"8\" width=\"12\" height=\"7\" rx=\"2\" fill=\"#5EC8E8\"/><path d=\"M27 15h10c0 5 6 6 6 14v21a6 6 0 0 1-6 6H27a6 6 0 0 1-6-6V29c0-8 6-9 6-14z\" fill=\"#DFF4FB\"/><path d=\"M21 34h22\" fill=\"none\" stroke-width=\"2.6\"/></g></svg>","pos":{"side":"any","y":[3,13],"rot":[-40,40],"scale":0.95},"say":["水はちゃんと飲んでるよ！えらい？","助かる〜ありがと","空いたの置きっぱなしにしちゃうんだよね"]},{"id":"sock","n":"くつ下","svg":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\"><g stroke=\"#000\" stroke-width=\"3.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"><path d=\"M22 12h16v22c0 6 14 6 14 15s-9 11-15 7L24 46c-2-1-2-4-2-6z\" fill=\"#FFFFFF\"/><path d=\"M22 20h16\" fill=\"none\" stroke-width=\"2.6\"/></g></svg>","pos":{"side":"any","y":[3,11],"rot":[-35,35],"scale":0.9},"say":["あー！片方さがしてたやつ","ありがと、洗濯かごに入れとく","くつ下っていつの間にか散らばるよね"]},{"id":"box","n":"通販の箱","svg":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\"><g stroke=\"#000\" stroke-width=\"3.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"><path d=\"M10 24h44v26H10z\" fill=\"#D9A86C\"/><path d=\"M10 24l6-10h32l6 10\" fill=\"#EFC894\"/><path d=\"M32 14v10M32 24v26\" fill=\"none\" stroke-width=\"2.6\"/><path d=\"M24 32h16\" fill=\"none\" stroke-width=\"2.6\" stroke=\"#A87A42\"/></g></svg>","pos":{"side":"any","y":[3,10],"rot":[-14,14],"scale":1.1},"say":["届いたの、うれしくて開けたまんまだった","ありがと！つぶしておくね","また買っちゃった、、、ないしょね"]},{"id":"cup","n":"カップ麺","svg":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\"><g stroke=\"#000\" stroke-width=\"3.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"><path d=\"M17 20h30l-4 30H21z\" fill=\"#FFF4E2\"/><rect x=\"14\" y=\"13\" width=\"36\" height=\"8\" rx=\"3\" fill=\"#E8503F\"/><path d=\"M22 30h20\" fill=\"none\" stroke-width=\"2.6\" stroke=\"#E8503F\"/></g></svg>","pos":{"side":"any","y":[3,12],"rot":[-18,18],"scale":1.0},"say":["夜中に食べるとおいしいんだよね〜","ありがと！次はちゃんと片付ける","スープは残したよ、えらくない？"]}];
+var PROPS = [{"id":"snack","n":"お菓子の袋","svg":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\"><g stroke=\"#000\" stroke-width=\"3.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"><path d=\"M18 16l4 3 4-3 4 3 4-3 4 3 4-3v34l-4-3-4 3-4-3-4 3-4-3-4 3z\" fill=\"#FF9EB8\"/><path d=\"M18 27h28\" fill=\"none\" stroke-width=\"2.8\" stroke=\"#E0658A\"/><path d=\"M18 38h28\" fill=\"none\" stroke-width=\"2.8\" stroke=\"#E0658A\"/></g></svg>","pos":{"side":"any","y":[4,15],"rot":[-22,22],"scale":1.0},"say":["あ、それ食べた。おいしかった！","ありがと〜、ちゃんと捨てるね","お菓子はね、責めない。楽しかったならヨシ！","わ、拾ってくれた。助かる〜","うん、また食べる。でも今日は片付いた！"]},{"id":"shirt","n":"脱ぎっぱなしの服","svg":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\"><g fill=\"#FDCB23\" stroke=\"#000\" stroke-width=\"3.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"><path d=\"M24 16l-13 7 5 9 6-3v19h24V29l6 3 5-9-13-7z\"/><path d=\"M24 16c1.6 4.4 14.4 4.4 16 0\" fill=\"none\"/></g></svg>","pos":{"side":"any","y":[3,12],"rot":[-30,30],"scale":1.05},"say":["たたむの、あとでいいかなって思ってた","ありがと！部屋がすっとした","これ着心地よくてさ〜","お、ナイス。あとで洗うね","脱いだとこに置いちゃうの、あるある"]},{"id":"bottle","n":"ペットボトル","svg":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\"><g stroke=\"#000\" stroke-width=\"3.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"><rect x=\"26\" y=\"8\" width=\"12\" height=\"7\" rx=\"2\" fill=\"#5EC8E8\"/><path d=\"M27 15h10c0 5 6 6 6 14v21a6 6 0 0 1-6 6H27a6 6 0 0 1-6-6V29c0-8 6-9 6-14z\" fill=\"#DFF4FB\"/><path d=\"M21 34h22\" fill=\"none\" stroke-width=\"2.6\"/></g></svg>","pos":{"side":"any","y":[3,13],"rot":[-40,40],"scale":0.95},"say":["水はちゃんと飲んでるよ！えらい？","助かる〜ありがと","空いたの置きっぱなしにしちゃうんだよね","おっ、きれいになった","これ今日3本目。飲んでるでしょ？"]},{"id":"sock","n":"くつ下","svg":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\"><g stroke=\"#000\" stroke-width=\"3.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"><path d=\"M22 12h16v22c0 6 14 6 14 15s-9 11-15 7L24 46c-2-1-2-4-2-6z\" fill=\"#FFFFFF\"/><path d=\"M22 20h16\" fill=\"none\" stroke-width=\"2.6\"/></g></svg>","pos":{"side":"any","y":[3,11],"rot":[-35,35],"scale":0.9},"say":["あー！片方さがしてたやつ","ありがと、洗濯かごに入れとく","くつ下っていつの間にか散らばるよね","ナイスキャッチ！","もう片方はどこ行ったんだろ、、、"]},{"id":"box","n":"通販の箱","svg":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\"><g stroke=\"#000\" stroke-width=\"3.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"><path d=\"M10 24h44v26H10z\" fill=\"#D9A86C\"/><path d=\"M10 24l6-10h32l6 10\" fill=\"#EFC894\"/><path d=\"M32 14v10M32 24v26\" fill=\"none\" stroke-width=\"2.6\"/><path d=\"M24 32h16\" fill=\"none\" stroke-width=\"2.6\" stroke=\"#A87A42\"/></g></svg>","pos":{"side":"any","y":[3,10],"rot":[-14,14],"scale":1.1},"say":["届いたの、うれしくて開けたまんまだった","ありがと！つぶしておくね","また買っちゃった、、、ないしょね","おお、床が広くなった","箱って気づくと増えてるんだよね"]},{"id":"cup","n":"カップ麺","svg":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\"><g stroke=\"#000\" stroke-width=\"3.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"><path d=\"M17 20h30l-4 30H21z\" fill=\"#FFF4E2\"/><rect x=\"14\" y=\"13\" width=\"36\" height=\"8\" rx=\"3\" fill=\"#E8503F\"/><path d=\"M22 30h20\" fill=\"none\" stroke-width=\"2.6\" stroke=\"#E8503F\"/></g></svg>","pos":{"side":"any","y":[3,12],"rot":[-18,18],"scale":1.0},"say":["夜中に食べるとおいしいんだよね〜","ありがと！次はちゃんと片付ける","スープは残したよ、えらくない？","お、すっきりした！","食べたことは消さない。片付けるだけ！"]}];
 var PROP_IX = {}; PROPS.forEach(function(p,i){ PROP_IX[p.id] = i; });
-var MESS_MAX = 5, MESS_EVERY_MS = 150*60000;   // 2時間半にひとつ散らかる
+// 何日空けても、床に出るのは最大3個まで。久しぶりに開いた人を絶望させないため
+var MESS_MAX = 3, MESS_PER_DAY = 3, MESS_EVERY_MS = 200*60000;   // 3時間20分にひとつ
 
 /* ============================================================
    3. セリフ
@@ -958,9 +984,10 @@ var LINES = {
     "きたー！！今日も会えたね！\nとりあえず生きてるだけで100点！",
     "おかえり！\n今日はどっちからいく？食べた話？動いた話？"
   ],
+  // 久しぶりに開いたときの第一声は、必ず歓迎から入る
   comeback:function(h){
-    if(h >= 72) return "……ねぇ。\n"+Math.floor(h/24)+"日ぶりだけど？\nまあいいや、戻ってきた人が一番えらい！";
-    if(h >= 24) return "1日ぶり！\nサボりは想定内。ここで戻れる人が痩せるんだよ〜";
+    if(h >= 72) return "おかえり！！\n会いたかった〜。\n戻ってきてくれるのが一番うれしい！";
+    if(h >= 24) return "おかえり！\nちょうど今日、会えた。\n今日はなにする？";
     return "";
   },
   egg:[
@@ -993,10 +1020,10 @@ var LINES = {
     C:["ふふ、リズム迷子だった？\nでも動いた時点でえらい！！","Cランク！でもね、\n1回目より2回目がうまくなるのが人間だから！"]
   },
   mess:{
-    some:["……ねぇ、床に何か落ちてない？\nタップで片付けよ？","部屋が散らかると、気分も散らかるんだよね〜\nはい、片付けタイム！"],
-    many:["ちょっと！！部屋やばくない！？\n片付けて〜〜！！これじゃ踊れないよ！","……くさい。\nゴミの上でダイエットする人いないからね？"],
-    clean:["ありがと〜！！すっきり！","おお〜片付け上手！","掃除もカロリー使うからね！えらい！"],
-    allClean:["部屋ピカピカ！！\n部屋がきれいな人は痩せるって、マジであるから！","わ〜きれい！\nこの部屋なら踊れる！ダンスしよ？"]
+    // 責めない・急かさない。気づいたら気持ちよかった、くらいの温度にする
+    some:["あ、床にちょっと落ちてる。\n気が向いたらタップしてみて！","なんか落ちてるね〜。\nひとつ拾うだけでも気持ちいいよ","床のやつ、いつでもいいからね！"],
+    clean:["ありがと〜！すっきり！","お、いい感じ！","助かる〜"],
+    allClean:["床、なんにもない！\nこの感じ好きなんだよね〜","わ、ひろい！\nなんか気分までかるくなった"]
   },
   wear:["どう？似合う？？\n服が変わると気分も変わるんだよね〜","きゃー！かわいい！！\nありがと、大事に着るね！","新しい自分、って感じ！\n痩せたら着る服は先に買う派！"],
   unlock:"新しいアイテムゲット！\nクローゼットに入れといたよ〜！",
@@ -1032,7 +1059,7 @@ var LINES = {
       "今日はもう閉店！おやすみ〜、また明日ね！"
     ],
     moodLow:[
-      "なんか元気ない？いいよ、今日はサボりで。\n明日もサボったらさすがに怒るけど！",
+      "なんか元気ない？いいよ、今日はゆっくりで。\n休むのも、ちゃんと続けるうちだからね",
       "うまくいかない日ってあるよ。でも記録だけしとこ？それでいい",
       "ねぇ、ちゃんと自分のこと褒めた？\nここ開いた時点でえらいからね",
       "落ちてる日は決断しないのが正解。\nとりあえず水飲んで寝よ"
@@ -1078,7 +1105,7 @@ var LINES = {
       "今ちょっとだけお腹に力入れてみて。\nはい、それ腹筋！",
       "ダイエットって我慢じゃなくて、\n機嫌よく続けることだからね",
       "明日の自分のためにできること、今日は一個でいいよ",
-      "サボった日を数えるより、やった日を数えよ〜",
+      "できなかった日は数えなくていい。\nやった日だけ数えよ〜",
       "鏡の前でポーズ取ってみ？\n笑えるし、意外と変わってるから",
       "停滞期？それ体が守りに入ってるだけ。\n2週間は淡々といこ",
       "痩せる順番って、顔→上半身→お腹→下半身。\nお腹が最後じゃないだけマシ！",
@@ -1139,13 +1166,41 @@ function say(text){
     }
   }, 34);
 }
-function sparkle(n, chars){
-  chars = chars || ["✨","💕"];
+/* 片付けた場所に出る、小さな線画のポンッ */
+function puff(px, py){
+  var el=document.createElement("div");
+  el.className="puff"; el.style.left=px+"px"; el.style.top=py+"px";
+  for(var i=0;i<6;i++){
+    var a=(i/6)*6.283 + Math.random()*0.5, d=16+Math.random()*10;
+    var sp=document.createElement("span");
+    sp.style.setProperty("--px", (Math.cos(a)*d).toFixed(1)+"px");
+    sp.style.setProperty("--py", (Math.sin(a)*d-4).toFixed(1)+"px");
+    sp.style.animationDelay=(i*12)+"ms";
+    el.appendChild(sp);
+  }
+  stage.appendChild(el);
+  setTimeout(function(){ el.remove(); }, 620);
+}
+/* 2-2 全部片付いたときだけ、部屋がふわっと明るくなる。1回きり・見た目だけ */
+function shineRoom(){
+  stage.classList.remove("shine-on"); void stage.offsetWidth;
+  stage.classList.add("shine-on");
+  setTimeout(function(){ stage.classList.remove("shine-on"); }, 1600);
+}
+/* キラキラもキャラと同じ線画にそろえる（絵文字をやめた） */
+var SPARK_SVG = {
+  star:'<svg viewBox="0 0 24 24"><path d="M12 1.5c1 5.6 3.9 8.5 9.5 9.5-5.6 1-8.5 3.9-9.5 9.5-1-5.6-3.9-8.5-9.5-9.5 5.6-1 8.5-3.9 9.5-9.5z" fill="#FFD54A" stroke="#241F1E" stroke-width="1.9" stroke-linejoin="round"/></svg>',
+  heart:'<svg viewBox="0 0 24 24"><path d="M12 21C5.5 16.4 2.5 13.2 2.5 9.4A5 5 0 0 1 12 7a5 5 0 0 1 9.5 2.4c0 3.8-3 7-9.5 11.6z" fill="#FF7FA3" stroke="#241F1E" stroke-width="1.9" stroke-linejoin="round"/></svg>',
+  bubble:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.6" fill="#DDF4FF" stroke="#241F1E" stroke-width="1.9"/><circle cx="9" cy="9" r="2.1" fill="#fff"/></svg>',
+  gift:'<svg viewBox="0 0 24 24"><rect x="3" y="9" width="18" height="12" rx="2" fill="#FF9EB8" stroke="#241F1E" stroke-width="1.9"/><rect x="2" y="5.5" width="20" height="4.5" rx="1.6" fill="#FFC7D6" stroke="#241F1E" stroke-width="1.9"/><path d="M12 5.5V21" stroke="#241F1E" stroke-width="1.9"/></svg>'
+};
+function sparkle(n, kind){
+  var svg = SPARK_SVG[kind] || SPARK_SVG.star;
   for(var k=0;k<n;k++){
     (function(k){
       setTimeout(function(){
         var el=document.createElement("div");
-        el.className="spark"; el.textContent = pick(chars);
+        el.className="spark"; el.innerHTML = svg;
         el.style.left=(26+Math.random()*48)+"%";
         el.style.top=(38+Math.random()*22)+"%";
         el.style.setProperty("--dx",(Math.random()*40-20)+"px");
@@ -1726,7 +1781,7 @@ function idleLoop(){
             : ACTS;
       if(S.mess.length >= 3 && Math.random() < 0.4) w = ["tilt","shy","tilt"];
       playAct(pick(w));
-      if(S.beauty >= 75 && Math.random() < 0.5) sparkle(3, ["✨","⭐","✨"]);
+      if(S.beauty >= 75 && Math.random() < 0.5) sparkle(3,"star");
     }
     idleLoop();
   }, 4000 + Math.random()*4000);
@@ -1859,7 +1914,7 @@ function checkUnlocks(){
   if(got.length){
     S.closetNew=true;
     got.forEach(function(it,i){ toast("🎁 「"+it.name+"」をゲット！", true); });
-    setTimeout(function(){ sparkle(6, ["🎁","✨","💝"]); }, 300);
+    setTimeout(function(){ sparkle(6,"gift"); }, 300);
     applyLook();
   }
   return got;
@@ -1888,7 +1943,7 @@ function playEvolve(from, to){
   playAct("shy");
   setTimeout(function(){
     var r=$("evoRays"); r.classList.remove("on"); void r.offsetWidth; r.classList.add("on");
-    flash(true); sparkle(14, ["✨","⭐","🌟"]);
+    flash(true); sparkle(14,"star");
     setTimeout(function(){
       showTag("しんか！ "+st.name, true);
       render(); playAct("win");
@@ -1900,7 +1955,7 @@ function tapEgg(){
   if(S.stage !== 0) return;
   S.eggTaps++;
   eggEl.classList.remove("wob"); void eggEl.offsetWidth; eggEl.classList.add("wob");
-  sparkle(2, ["💗","✨"]);
+  sparkle(2,"heart");
   applyLook();
   if(S.eggTaps >= 7){ hatch(); return; }
   var idx = Math.min(LINES.egg.length-1, Math.floor(S.eggTaps/2));
@@ -1980,11 +2035,12 @@ function cleanMess(el){
   S.mood   = clamp(S.mood+3, 0, 100);
   S.puni   = clamp(S.puni-0.6, 0, 100);
   var rect = el.getBoundingClientRect(), sr = stage.getBoundingClientRect();
-  fx("ピカッ✨", "#6BB7FF", (rect.left-sr.left+rect.width/2)/sr.width*100-8, (rect.top-sr.top)/sr.height*100-4);
+  puff(rect.left-sr.left+rect.width/2, rect.top-sr.top+rect.height/2);
   var before = S.shape;
   markCare();
-  if(S.mess.length===0){ playAct("win"); say(pick(LINES.mess.allClean)); sparkle(6, ["✨","🫧"]); }
-  else { playAct("clap"); say(pick(LINES.mess.clean)); }
+  var P = PROPS[m.t] || PROPS[0];
+  if(S.mess.length===0){ playAct("win"); say(pick(LINES.mess.allClean)); sparkle(6,"bubble"); shineRoom(); }
+  else { playAct("clap"); say(pick(P.say)); }
   renderMess();
   checkUnlocks();
   finish(before);
@@ -1995,18 +2051,22 @@ function cleanMess(el){
    ============================================================ */
 function applyElapsed(hours){
   if(hours <= 0) return;
-  var messN = S.mess.length;
-  S.beauty = clamp(S.beauty - hours*(0.8 + messN*0.6), 0, 100);
-  S.mood   = clamp(S.mood - hours*(0.5 + messN*0.5), 0, 100);
-  S.puni   = clamp(S.puni + hours*0.4, 0, 100);
+  // 放置しても何も下がらない。時間で動くのは「休んで戻るたいりょく」だけ。
+  // 時間が増やすのは部屋の散らかりだけで、それは tickMess が持っている（1日3個まで）
   S.energy = clamp(S.energy + hours*2.2, 0, 100);
 }
 function tickMess(){
   if(S.stage===0) return 0;
-  var now=Date.now(), n=0;
+  var now=Date.now(), n=0, t=todayKey();
+  if(S.messDay !== t){ S.messDay = t; S.messToday = 0; }
   if(!S.messAt) S.messAt=now;
-  while(now - S.messAt >= MESS_EVERY_MS && S.mess.length < MESS_MAX){ S.messAt += MESS_EVERY_MS; n+=spawnMess(1); }
-  if(S.mess.length >= MESS_MAX) S.messAt = now;
+  // 溜まった時間ぶんを一気に出さない。1日3個・床に3個までで打ち止め
+  while(now - S.messAt >= MESS_EVERY_MS){
+    S.messAt += MESS_EVERY_MS;
+    if(S.mess.length >= MESS_MAX || S.messToday >= MESS_PER_DAY) continue;
+    var a = spawnMess(1); n += a; S.messToday += a;
+  }
+  if(now - S.messAt > MESS_EVERY_MS) S.messAt = now;
   return n;
 }
 function tickOffline(){
@@ -2030,8 +2090,7 @@ function tickOffline(){
     S.mealCount=0; S.moveCount=0; S.danceCount=0; S.lookRepeat=0; S.lastDay=t;
   }
   S.visits++;
-  if(!msg && S.mess.length >= 4) msg = pick(LINES.mess.many);
-  else if(!msg && S.mess.length >= 2) msg = pick(LINES.mess.some);
+  if(!msg && S.mess.length >= 2) msg = pick(LINES.mess.some);
   return msg;
 }
 
@@ -2160,8 +2219,7 @@ function lookLine(){
   if(S.energy < 25) ctx = ctx.concat(L.tired);
   if(S.beauty >= 75) ctx = ctx.concat(L.beautyHigh);
   if(S.beauty <= 30) ctx = ctx.concat(L.beautyLow);
-  if(S.mess.length >= 3) ctx = ctx.concat(LINES.mess.many);
-  else if(S.mess.length >= 1) ctx = ctx.concat(LINES.mess.some);
+  if(S.mess.length >= 1) ctx = ctx.concat(LINES.mess.some);
   if(S.weight == null) ctx = ctx.concat(L.noWeight);
 
   if(S.shape === "chubby" || S.shape === "toomuch") ctx.push(LINES.shape[S.shape]);
@@ -2239,7 +2297,6 @@ function sheetDance(){
   if(S.stage===0) return;
   if(S.danceCount>=3){ say(pick(LINES.overCap)); return; }
   if(S.energy<25){ playAct("nap"); say(pick(LINES.lowEnergy)); return; }
-  if(S.mess.length>=4){ playAct("shy"); say(pick(LINES.mess.many)); sparkle(2,["💢"]); return; }
   openSheet(
     '<h3>💃 ダンスでダイエット</h3><p class="sub">右から流れてくる ♪ が、左の白い◯に重なった瞬間に画面をタップ！<br>ぷに −／きれい ＋／キゲン ＋。たいりょくを '+Math.round(S.energy)+' → '+Math.round(S.energy-22)+' 使うよ</p>'+
     optHTML("danceStart","🎵","踊る！（約20秒）","ベスト："+(S.danceBest? S.danceBest+"点 "+S.danceBestRank+"ランク" : "まだなし"))+
@@ -2303,7 +2360,7 @@ function danceFrame(){
       if(beat===3) floatEl.classList.add("dancing");
     }
     kickRig(2.0);
-    if(beat>=4 && beat%2===0 && S.beauty>=60) sparkle(1,["✨"]);
+    if(beat>=4 && beat%2===0 && S.beauty>=60) sparkle(1,"star");
   }
   D.notes.forEach(function(n){
     if(n.done) return;
@@ -2326,7 +2383,7 @@ function judge(n, kind){
   n.done=true;
   if(n.el){ n.el.classList.add(kind==="miss"?"miss":"hit"); (function(el){ setTimeout(function(){ el.remove(); },400); })(n.el); }
   var j=document.createElement("div"); j.className="judge "+kind;
-  if(kind==="perfect"){ D.perfect++; D.combo++; D.score+=100+Math.min(100,D.combo*5); j.textContent="PERFECT!"; sfxHit(D.combo,true); sparkle(2,["✨","💖"]); }
+  if(kind==="perfect"){ D.perfect++; D.combo++; D.score+=100+Math.min(100,D.combo*5); j.textContent="PERFECT!"; sfxHit(D.combo,true); sparkle(2,"heart"); }
   else if(kind==="good"){ D.good++; D.combo++; D.score+=60+Math.min(60,D.combo*3); j.textContent="GOOD"; sfxHit(D.combo,false); }
   else { D.miss++; D.combo=0; j.textContent="miss…"; sfxMiss(); }
   if(D.combo>D.maxCombo) D.maxCombo=D.combo;
