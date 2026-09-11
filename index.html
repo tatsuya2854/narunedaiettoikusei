@@ -134,23 +134,55 @@ body{
 .weight-row .d{margin-left:auto;font-size:11px;font-weight:700;font-variant-numeric:tabular-nums}
 .d.down{color:var(--mint)} .d.up{color:var(--peach)} .d.flat{color:var(--ink-2);font-weight:600}
 
-/* ---------- 中央ステージ（部屋） ---------- */
+/* ---------- 中央ステージ（部屋） ----------
+   時間帯で3つに切り替える（端末のローカル時刻）。
+   どの時間帯でも「壁・床・境目」が見えること。真っ黒は使わない。 */
 .stage{
   position:relative;flex:1 1 auto;min-height:0;
-  background:
-    radial-gradient(120% 78% at 50% 2%, #FFFBFC 0%, var(--wall) 58%, #FAE6EC 100%);
   overflow:hidden;
-  transition:filter .8s ease;
+  transition:background 1.2s ease, filter .8s ease;
+  --wallA:#FFFDFB; --wallB:#FDEFF3; --wallC:#F6DFE7;   /* 昼 */
+  --floorA:#F7E4EA; --floorB:#EED2DC;
+  --base:rgba(36,31,30,.10);          /* 壁と床の境目（幅木） */
+  --lampX:50%; --lampY:0%; --lampC:rgba(255,255,255,0);
+  background:
+    radial-gradient(90% 55% at var(--lampX) var(--lampY), var(--lampC) 0%, rgba(255,255,255,0) 62%),
+    radial-gradient(125% 82% at 50% 0%, var(--wallA) 0%, var(--wallB) 55%, var(--wallC) 100%);
+}
+/* 朝：やわらかい自然光。窓の側が明るい */
+.stage[data-tod="morning"]{
+  --wallA:#FFF9F2; --wallB:#FFEFE2; --wallC:#FCDDD2;
+  --floorA:#F7E0D0; --floorB:#EDCBBA;
+  --lampX:16%; --lampY:16%; --lampC:rgba(255,236,190,.85);
+}
+/* 昼：白っぽい日中光 */
+.stage[data-tod="day"]{
+  --lampX:24%; --lampY:8%; --lampC:rgba(255,255,255,.7);
+}
+/* 夜：暖色の間接照明。暗いけれど黒にはしない */
+.stage[data-tod="night"]{
+  --wallA:#6E5566; --wallB:#5A4457; --wallC:#4A3749;
+  --floorA:#6A4E5C; --floorB:#513A48;
+  --base:rgba(255,236,206,.16);
+  --lampX:82%; --lampY:10%; --lampC:rgba(255,206,138,.55);
 }
 .stage::after{ /* 床 */
   content:"";position:absolute;left:0;right:0;bottom:0;height:26%;
-  background:linear-gradient(180deg,var(--floor),#F0D2DC);
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.7);
+  background:
+    radial-gradient(60% 90% at var(--lampX) -10%, rgba(255,255,255,.22) 0%, rgba(255,255,255,0) 70%),
+    linear-gradient(180deg,var(--floorA),var(--floorB));
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.45);
+  transition:background 1.2s ease;
+}
+.stage::before{ /* 幅木＝壁と床の境目。これがあると奥行きが出る */
+  content:"";position:absolute;left:0;right:0;bottom:26%;height:5px;z-index:1;
+  background:linear-gradient(180deg,var(--base),rgba(255,255,255,0));
+  transition:background 1.2s ease;
 }
 /* 散らかると部屋がくすむ */
-.stage[data-mess="3"]{filter:saturate(.9) brightness(.97)}
-.stage[data-mess="4"]{filter:saturate(.8) brightness(.94) sepia(.08)}
-.stage[data-mess="5"]{filter:saturate(.7) brightness(.9) sepia(.16)}
+.stage[data-mess="3"]{filter:saturate(.94) brightness(.985)}
+.stage[data-mess="4"]{filter:saturate(.88) brightness(.97)}
+.stage[data-mess="5"]{filter:saturate(.82) brightness(.955)}
 
 /* 窓・棚・クローゼット（小道具） */
 .window{
@@ -162,7 +194,9 @@ body{
 .window::before,.window::after{content:"";position:absolute;background:rgba(255,255,255,.9)}
 .window::before{left:50%;top:0;bottom:0;width:4px;transform:translateX(-2px)}
 .window::after{top:50%;left:0;right:0;height:4px;transform:translateY(-2px)}
-.stage.night .window{background:linear-gradient(180deg,#2B2F6B,#4A4F9E)}
+.stage[data-tod="morning"] .window{background:linear-gradient(180deg,#FFE7BE,#FFF7E8)}
+.stage[data-tod="night"] .window{background:linear-gradient(180deg,#2F3466,#4C5190)}
+.stage[data-tod="night"] .shelf .cap,.stage[data-tod="night"] .closet .cap{color:rgba(255,245,235,.72)}
 .shelf{position:absolute;bottom:29%;right:8px;width:76px;text-align:center;z-index:1}
 .shelf .plank{height:6px;background:#E9C4AE;border-radius:99px;box-shadow:var(--sh-1)}
 .shelf .jar{
@@ -193,26 +227,21 @@ body{
 .closet .new.on{display:block}
 @keyframes bounce{50%{transform:translateY(-3px)}}
 
-/* 散らかりもの（うんちの代わり） */
+/* 散らかりもの。キャラと同じ「太い黒線＋ベタ塗り」の線画にそろえる */
 .mess{
-  position:absolute;z-index:3;width:46px;height:46px;border:0;background:none;padding:0;
-  font-size:30px;line-height:46px;text-align:center;cursor:pointer;
-  filter:drop-shadow(0 3px 2px rgba(74,34,51,.25));
-  transform:rotate(var(--rot,0deg));
+  position:absolute;z-index:3;width:52px;height:52px;border:0;background:none;padding:0;
+  cursor:pointer;
+  filter:drop-shadow(0 3px 3px rgba(58,32,44,.22));
+  transform:rotate(var(--rot,0deg)) scale(var(--ms,1));
   animation:messin .5s cubic-bezier(.2,1.6,.4,1) both;
   touch-action:manipulation;
+  transition:transform .12s ease;
 }
-.mess::after{ /* もわもわ臭 */
-  content:"〜";position:absolute;left:50%;top:-14px;transform:translateX(-50%);
-  font-size:14px;font-weight:800;color:#8C7A50;opacity:0;
-  animation:stink 1.6s ease-in-out infinite;
-}
-.stage[data-mess="3"] .mess::after,.stage[data-mess="4"] .mess::after,.stage[data-mess="5"] .mess::after{opacity:.75}
-@keyframes stink{0%,100%{transform:translate(-50%,0) rotate(0)}50%{transform:translate(-50%,-6px) rotate(12deg)}}
+.mess svg{width:100%;height:100%;display:block}
 @keyframes messin{from{transform:translateY(-40px) rotate(var(--rot,0deg)) scale(.4);opacity:0}}
-.mess:active{transform:scale(.85) rotate(var(--rot,0deg))}
+.mess:active{transform:rotate(var(--rot,0deg)) scale(calc(var(--ms,1) * .86))}
 .mess.gone{animation:messout .4s ease forwards;pointer-events:none}
-@keyframes messout{to{transform:scale(0) rotate(180deg);opacity:0}}
+@keyframes messout{to{transform:rotate(200deg) scale(0);opacity:0}}
 .mess-hint{
   position:absolute;right:10px;top:116px;z-index:4;
   background:rgba(36,31,30,.72);color:#fff;border:0;border-radius:999px;
@@ -252,11 +281,15 @@ body{
   width:268px;height:278px;
   display:flex;align-items:flex-end;justify-content:center;
 }
+/* 接地影。キャラを床に置くための影なので、位置も大きさも
+   描画側（drawRig）が毎フレーム決める。跳ぶと小さく薄くなる */
 .shadow{
-  position:absolute;bottom:-8px;left:50%;transform:translateX(-50%);
-  width:104px;height:16px;border-radius:50%;background:rgba(74,34,51,.16);filter:blur(2px);
-  animation:sh 2.4s ease-in-out infinite;
+  position:absolute;z-index:0;pointer-events:none;border-radius:50%;
+  background:rgba(58,32,44,.22);filter:blur(9px);
+  transform:translate(-50%,-50%);
+  will-change:transform,opacity,width;
 }
+.stage[data-tod="night"] .shadow{background:rgba(20,10,18,.30)}
 /* ふわふわ（周期3.7s）と ぷにぷに（周期1.55s）を別レイヤーで回す。
    周期をわざとズラすと、ループの繰り返しが目に見えなくなる */
 .av-float{
@@ -295,21 +328,10 @@ body{
   display:none;position:absolute;inset:0;
   background-repeat:no-repeat;background-position:var(--fbp,0 0);background-size:var(--fbs,auto);
 }
-@keyframes sh{0%,100%{transform:translateX(-50%) scale(1);opacity:.16}
-              47%{transform:translateX(-50%) scale(.78);opacity:.08}}
 
 /* きれい度で見た目が変わる */
-.avatar-wrap[data-beauty="high"] .body{filter:saturate(1.12) brightness(1.04) drop-shadow(0 0 6px rgba(255,236,150,.8))}
+.avatar-wrap[data-beauty="high"] .body{filter:saturate(1.10) brightness(1.03)}
 .avatar-wrap[data-beauty="low"]  .body{filter:saturate(.68) brightness(.93) contrast(.96)}
-.aura{
-  position:absolute;left:50%;top:52%;width:120%;aspect-ratio:1;z-index:-1;
-  transform:translate(-50%,-50%);border-radius:50%;pointer-events:none;
-  background:radial-gradient(circle,rgba(255,240,160,.7) 0%,rgba(255,220,120,.25) 40%,rgba(255,220,120,0) 66%);
-  opacity:0;transition:opacity .9s ease;
-  animation:aura 2.6s ease-in-out infinite;
-}
-.avatar-wrap[data-beauty="high"] .aura{opacity:1}
-@keyframes aura{50%{transform:translate(-50%,-50%) scale(1.08)}}
 .stinkLines{
   position:absolute;right:6%;top:6%;width:22%;pointer-events:none;
   opacity:0;transition:opacity .6s ease;
@@ -317,10 +339,9 @@ body{
 .avatar-wrap[data-beauty="low"] .stinkLines{opacity:.8;animation:stinkL 1.8s ease-in-out infinite}
 @keyframes stinkL{0%,100%{transform:translateY(0) rotate(-4deg)}50%{transform:translateY(-8px) rotate(6deg)}}
 /* 太ると汗、痩せすぎるとふらふら */
-.avatar-wrap[data-shape="chubby"] .body::after{
-  content:"💦";position:absolute;right:14%;top:22%;font-size:20px;animation:sweat 1.4s ease-in-out infinite;
-}
-@keyframes sweat{0%,100%{opacity:0;transform:translateY(-4px)}40%{opacity:1}80%{opacity:0;transform:translateY(10px)}}
+.sweat{position:absolute;right:8%;top:20%;width:15%;z-index:5;opacity:0;pointer-events:none}
+.avatar-wrap[data-shape="chubby"] .sweat{opacity:1;animation:sweat 1.4s ease-in-out infinite}
+@keyframes sweat{0%,100%{opacity:0;transform:translateY(-4px)}40%{opacity:.95}80%{opacity:0;transform:translateY(10px)}}
 .avatar-wrap[data-shape="toomuch"] .av-float{animation-duration:1.6s}
 
 /* アクセサリー（ポーズごとの頭の位置に追従） */
@@ -677,9 +698,9 @@ body{
     --sh-3:0 8px 24px rgba(0,0,0,.5), 0 24px 60px rgba(0,0,0,.5);
   }
   body{background:#0E0C11}
-  .stage{background:radial-gradient(120% 78% at 50% 2%, #4A3743 0%, var(--wall) 58%, #33242E 100%)}
-  .stage::after{background:linear-gradient(180deg,var(--floor),#251A21);box-shadow:inset 0 1px 0 rgba(255,255,255,.06)}
-  .window{background:linear-gradient(180deg,#2B2F6B,#4A4F9E);border-color:rgba(255,255,255,.18)}
+  /* 部屋の明るさは端末のダークモードではなく「時間帯」で決める。
+     ここで暗くすると、朝に開いても真っ暗な部屋になってしまう */
+  .window{border-color:rgba(255,255,255,.55)}
   .opt,.wear,.sheet .close,.wt-input{background:#2A2630}
   .opt:active{background:#332E3A}
   .wear.lock{background:#2A2630}
@@ -697,7 +718,6 @@ body{
     <div class="hud-top">
       <div class="brand">なるねぇといっしょ<br><small id="stageChip"><span class="lv">Lv.1</span><span id="stageName">たまご</span></small></div>
       <div class="hud-right">
-        <div class="streak"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.6c.7 2.5 2.3 3.7 3.5 5.2A6.6 6.6 0 1 1 5.9 13.8c0-2 1-3.7 2.3-4.9.2 1.1.8 2 1.6 2.4-.3-3.4.6-6.3 2.2-8.7Z"/></svg><span class="n" id="streak">0</span>日目</div>
         <div class="age" id="age">そだてて 0日</div>
       </div>
     </div>
@@ -742,14 +762,18 @@ body{
     <div class="bubble" id="bubble" role="status" aria-live="polite">…</div>
 
     <div class="avatar-wrap" id="avatarWrap" data-shape="natural" data-beauty="mid">
-      <div class="shadow" aria-hidden="true"></div>
       <div class="av-float" id="avFloat">
         <div class="av-grow" id="avGrow">
           <div class="aura" aria-hidden="true"></div>
           <div class="body" id="body">
+            <i class="shadow" id="shadow" aria-hidden="true"></i>
             <canvas class="rig" id="rigGL" role="img" aria-label="なるねぇ"></canvas>
             <i class="rigfb" id="rigFallback" aria-hidden="true"></i>
             <div class="acc" id="acc" aria-hidden="true"></div>
+            <svg class="sweat" viewBox="0 0 24 34" aria-hidden="true">
+              <path d="M12 2c5 8 9 12 9 18a9 9 0 0 1-18 0c0-6 4-10 9-18z" fill="#8FD3F4" stroke="#241F1E" stroke-width="2.6" stroke-linejoin="round"/>
+              <path d="M8 20c0 3 1.6 5 4 5.6" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/>
+            </svg>
             <svg class="stinkLines" viewBox="0 0 40 40" aria-hidden="true">
               <path d="M6 34c6-8-2-12 4-20M18 36c6-8-2-12 4-20M30 34c6-8-2-12 4-20" fill="none" stroke="#8C7A50" stroke-width="3" stroke-linecap="round"/>
             </svg>
@@ -894,7 +918,7 @@ var OUTFITS = [
   {id:"mint",    name:"ミントジャージ", c1:"#3FD1B0", c2:"#1E9C81", shirt:[168,.62,.55], shorts:[168,.55,.34], cond:"運動を5回", test:function(){return S.moveTotal>=5;}},
   {id:"pink",    name:"ピンクワンピ",   c1:"#FF7AA3", c2:"#FF7AA3", shirt:[338,.95,.66], shorts:[338,.95,.66], cond:"きれい80以上", test:function(){return S.beautyMax>=80;}},
   {id:"navy",    name:"ネイビースポ",   c1:"#3A55C8", c2:"#1F2B6B", shirt:[228,.62,.5],  shorts:[228,.55,.28], cond:"ダンスでAランク", test:function(){return "SA".indexOf(S.danceBestRank)>=0 && S.danceBestRank!=="";}},
-  {id:"lavender",name:"ラベンダー",     c1:"#B58CF0", c2:"#F0E6FF", shirt:[266,.72,.72], shorts:[266,.6,.9],   cond:"7日連続", test:function(){return S.streak>=7;}},
+  {id:"lavender",name:"ラベンダー",     c1:"#B58CF0", c2:"#F0E6FF", shirt:[266,.72,.72], shorts:[266,.6,.9],   cond:"そだてて7日", test:function(){return S.careDays>=7;}},
   {id:"black",   name:"くろスポ",       c1:"#2A2A33", c2:"#555560", shirt:[240,.08,.2],  shorts:[240,.06,.36], cond:"片付け20回", test:function(){return S.cleanCount>=20;}},
   {id:"red",     name:"あかスポ",       c1:"#F0334B", c2:"#FFFFFF", shirt:[352,.85,.56], shorts:[0,0,.93],     cond:"スタンプ30個", test:function(){return S.stamps>=30;}},
   {id:"gold",    name:"ゴールド",       c1:"#FF9A1F", c2:"#FFF1C2", shirt:[34,1,.5],     shorts:[46,.9,.88],   cond:"カリスマに進化", test:function(){return S.stage>=4;}}
@@ -920,10 +944,10 @@ var ACCS = [
     aw:"34%", ax:"0%", ay:"-4%",
     svg:'<svg viewBox="0 0 80 56"><path d="M8 48L4 14l18 14L40 6l18 22 18-14-4 34z" fill="#FFC24B" stroke="#1a1a1a" stroke-width="3" stroke-linejoin="round"/><rect x="8" y="42" width="64" height="10" rx="3" fill="#FFB13B" stroke="#1a1a1a" stroke-width="3"/><circle cx="40" cy="30" r="5" fill="#FF5E86" stroke="#1a1a1a" stroke-width="2.5"/><circle cx="20" cy="36" r="3.5" fill="#2FBFA0" stroke="#1a1a1a" stroke-width="2.5"/><circle cx="60" cy="36" r="3.5" fill="#2FBFA0" stroke="#1a1a1a" stroke-width="2.5"/></svg>'}
 ];
-var MESS_TYPES = [
-  {e:"🍪", n:"お菓子の袋"}, {e:"👕", n:"脱ぎっぱなしの服"}, {e:"🥤", n:"ペットボトル"},
-  {e:"🧦", n:"くつ下"}, {e:"📦", n:"通販の箱"}, {e:"🍜", n:"カップ麺"}
-];
+/* 床に落ちるもの。中身は assets/props.json（＋ assets/props/*.svg）が唯一の正で、
+   build.py が画像ごとここに埋め込む。絵はキャラと同じ「太い黒線＋ベタ塗り」にそろえてある。 */
+var PROPS = [{"id":"snack","n":"お菓子の袋","svg":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\"><g stroke=\"#000\" stroke-width=\"3.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"><path d=\"M18 16l4 3 4-3 4 3 4-3 4 3 4-3v34l-4-3-4 3-4-3-4 3-4-3-4 3z\" fill=\"#FF9EB8\"/><path d=\"M18 27h28\" fill=\"none\" stroke-width=\"2.8\" stroke=\"#E0658A\"/><path d=\"M18 38h28\" fill=\"none\" stroke-width=\"2.8\" stroke=\"#E0658A\"/></g></svg>","pos":{"side":"any","y":[4,15],"rot":[-22,22],"scale":1.0},"say":["あ、それ食べた。おいしかった！","ありがと〜、ちゃんと捨てるね","お菓子はね、責めない。楽しかったならヨシ！"]},{"id":"shirt","n":"脱ぎっぱなしの服","svg":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\"><g fill=\"#FDCB23\" stroke=\"#000\" stroke-width=\"3.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"><path d=\"M24 16l-13 7 5 9 6-3v19h24V29l6 3 5-9-13-7z\"/><path d=\"M24 16c1.6 4.4 14.4 4.4 16 0\" fill=\"none\"/></g></svg>","pos":{"side":"any","y":[3,12],"rot":[-30,30],"scale":1.05},"say":["たたむの、あとでいいかなって思ってた","ありがと！部屋がすっとした","これ着心地よくてさ〜"]},{"id":"bottle","n":"ペットボトル","svg":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\"><g stroke=\"#000\" stroke-width=\"3.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"><rect x=\"26\" y=\"8\" width=\"12\" height=\"7\" rx=\"2\" fill=\"#5EC8E8\"/><path d=\"M27 15h10c0 5 6 6 6 14v21a6 6 0 0 1-6 6H27a6 6 0 0 1-6-6V29c0-8 6-9 6-14z\" fill=\"#DFF4FB\"/><path d=\"M21 34h22\" fill=\"none\" stroke-width=\"2.6\"/></g></svg>","pos":{"side":"any","y":[3,13],"rot":[-40,40],"scale":0.95},"say":["水はちゃんと飲んでるよ！えらい？","助かる〜ありがと","空いたの置きっぱなしにしちゃうんだよね"]},{"id":"sock","n":"くつ下","svg":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\"><g stroke=\"#000\" stroke-width=\"3.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"><path d=\"M22 12h16v22c0 6 14 6 14 15s-9 11-15 7L24 46c-2-1-2-4-2-6z\" fill=\"#FFFFFF\"/><path d=\"M22 20h16\" fill=\"none\" stroke-width=\"2.6\"/></g></svg>","pos":{"side":"any","y":[3,11],"rot":[-35,35],"scale":0.9},"say":["あー！片方さがしてたやつ","ありがと、洗濯かごに入れとく","くつ下っていつの間にか散らばるよね"]},{"id":"box","n":"通販の箱","svg":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\"><g stroke=\"#000\" stroke-width=\"3.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"><path d=\"M10 24h44v26H10z\" fill=\"#D9A86C\"/><path d=\"M10 24l6-10h32l6 10\" fill=\"#EFC894\"/><path d=\"M32 14v10M32 24v26\" fill=\"none\" stroke-width=\"2.6\"/><path d=\"M24 32h16\" fill=\"none\" stroke-width=\"2.6\" stroke=\"#A87A42\"/></g></svg>","pos":{"side":"any","y":[3,10],"rot":[-14,14],"scale":1.1},"say":["届いたの、うれしくて開けたまんまだった","ありがと！つぶしておくね","また買っちゃった、、、ないしょね"]},{"id":"cup","n":"カップ麺","svg":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\"><g stroke=\"#000\" stroke-width=\"3.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"><path d=\"M17 20h30l-4 30H21z\" fill=\"#FFF4E2\"/><rect x=\"14\" y=\"13\" width=\"36\" height=\"8\" rx=\"3\" fill=\"#E8503F\"/><path d=\"M22 30h20\" fill=\"none\" stroke-width=\"2.6\" stroke=\"#E8503F\"/></g></svg>","pos":{"side":"any","y":[3,12],"rot":[-18,18],"scale":1.0},"say":["夜中に食べるとおいしいんだよね〜","ありがと！次はちゃんと片付ける","スープは残したよ、えらくない？"]}];
+var PROP_IX = {}; PROPS.forEach(function(p,i){ PROP_IX[p.id] = i; });
 var MESS_MAX = 5, MESS_EVERY_MS = 150*60000;   // 2時間半にひとつ散らかる
 
 /* ============================================================
@@ -1308,6 +1332,24 @@ function buildRig(){
 }
 
 /* 骨のワールド行列 → 頂点をスキニング → 描く */
+var shadowEl = null;
+/* 接地影：床に貼り付いたまま。跳ぶと小さく薄くなる＝浮いて見える */
+function drawShadow(v, bx, k, ox, CH){
+  if(!shadowEl) shadowEl = $("shadow");
+  if(!shadowEl) return;
+  var W = G.W, H = G.H, K = G.K;
+  var up = Math.max(0, -v.ry*RS) * k / K;             // 床からの高さ（CSSpx）
+  var t  = Math.min(1, up / (H*0.42));
+  var w  = 0.70*(bx[2]-bx[0]+1)*k/K * (1 - 0.34*t);
+  var cx = ((m0.piv.torso[0] + v.rx*RS)*k + ox)/K - 0.18*W;
+  var cy = CH/K - 0.08*H - 4;
+  shadowEl.style.width  = w.toFixed(1)+"px";
+  shadowEl.style.height = (w*0.20).toFixed(1)+"px";
+  shadowEl.style.left   = cx.toFixed(1)+"px";
+  shadowEl.style.top    = cy.toFixed(1)+"px";
+  shadowEl.style.opacity = (1 - 0.55*t).toFixed(3);
+}
+var m0 = MESH;
 function drawRig(v, headDeg, headDy, ponyDeg, eCur){
   if(!G || !G.ready) return;
   var m = MESH, B = m.bones, gl = G.gl;
@@ -1379,6 +1421,7 @@ function drawRig(v, headDeg, headDy, ponyDeg, eCur){
   gl.viewport(0,0,CW,CH);
   gl.clearColor(0,0,0,0); gl.clear(gl.COLOR_BUFFER_BIT);
   gl.drawElements(gl.TRIANGLES, G.NI, gl.UNSIGNED_SHORT, 0);
+  drawShadow(v, bx, k, ox, CH);
   // アクセは頭にくっつける（DOMなので、同じ行列をCSSに渡すだけ）
   if(accEl && accEl.firstChild){
     var sc=k/G.K, ex=Hm[0]*bx[0]+Hm[2]*bx[1]+Hm[4], ey=Hm[1]*bx[0]+Hm[3]*bx[1]+Hm[5];
@@ -1722,7 +1765,8 @@ function applyLook(){
   wrap.setAttribute("data-beauty", S.beauty >= 75 ? "high" : S.beauty <= 30 ? "low" : "mid");
   stage.setAttribute("data-mess", String(S.mess.length));
   var h = new Date().getHours();
-  stage.classList.toggle("night", h >= 19 || h < 5);
+  // 部屋の明るさは端末の時刻で決める（朝5-10／昼10-17／夜17-5）
+  stage.setAttribute("data-tod", h>=5&&h<10 ? "morning" : h>=10&&h<17 ? "day" : "night");
   wrap.classList.toggle("egg-mode", S.stage === 0);
   eggEl.classList.toggle("on", S.stage === 0);
   eggEl.setAttribute("data-crack", String(Math.min(3, Math.floor(S.eggTaps/2))));
@@ -1891,9 +1935,21 @@ function hatch(){
 function spawnMess(n, typeIdx){
   var added=0;
   for(var k=0;k<n && S.mess.length<MESS_MAX;k++){
-    var side = Math.random()<0.5 ? -1 : 1;
-    var x = side<0 ? 8+Math.random()*18 : 66+Math.random()*20;
-    S.mess.push({t: typeIdx!=null ? typeIdx : Math.floor(Math.random()*MESS_TYPES.length), x:Math.round(x), y:Math.round(3+Math.random()*12), r:Math.round(Math.random()*40-20)});
+    var ti = typeIdx!=null ? typeIdx : Math.floor(Math.random()*PROPS.length);
+    var P = PROPS[ti] || PROPS[0], po = P.pos || {};
+    var yr = po.y || [3,14], rr = po.rot || [-20,20];
+    // 既にあるものと重ならない場所を探す（20回だけ試す）
+    var x = 0;
+    for(var tr=0; tr<20; tr++){
+      var side = Math.random()<0.5 ? -1 : 1;
+      x = side<0 ? 6+Math.random()*18 : 64+Math.random()*23;
+      var ok = true;
+      for(var q=0;q<S.mess.length;q++){ if(Math.abs(S.mess[q].x - x) < 13){ ok=false; break; } }
+      if(ok) break;
+    }
+    S.mess.push({t: ti, x:Math.round(x),
+                 y:Math.round(yr[0]+Math.random()*(yr[1]-yr[0])),
+                 r:Math.round(rr[0]+Math.random()*(rr[1]-rr[0]))});
     added++;
   }
   return added;
@@ -1901,10 +1957,12 @@ function spawnMess(n, typeIdx){
 function renderMess(){
   Array.prototype.forEach.call(stage.querySelectorAll(".mess"), function(el){ if(!el.classList.contains("gone")) el.remove(); });
   S.mess.forEach(function(m, i){
-    var mt = MESS_TYPES[m.t] || MESS_TYPES[0];
+    var mt = PROPS[m.t] || PROPS[0];
     var b=document.createElement("button");
-    b.className="mess"; b.textContent=mt.e; b.setAttribute("aria-label", mt.n+"を片付ける");
-    b.style.left=m.x+"%"; b.style.bottom=m.y+"%"; b.style.setProperty("--rot", m.r+"deg");
+    b.className="mess"; b.innerHTML=mt.svg; b.setAttribute("aria-label", mt.n+"を片付ける");
+    b.style.left=m.x+"%"; b.style.bottom=m.y+"%";
+    b.style.setProperty("--rot", m.r+"deg");
+    b.style.setProperty("--ms", String(mt.pos.scale || 1));
     b.setAttribute("data-i", String(i));
     stage.appendChild(b);
   });
@@ -1989,7 +2047,7 @@ function render(){
   $("barMood").firstElementChild.style.width=S.mood+"%";
   $("barEnergy").firstElementChild.style.width=S.energy+"%";
   $("barBeauty").firstElementChild.style.width=S.beauty+"%";
-  $("streak").textContent=S.streak;
+
   $("badgeMeal").textContent=S.mealCount+"/3";
   $("badgeMove").textContent=S.moveCount+"/3";
   $("badgeDance").textContent=S.danceCount+"/3";
@@ -2105,7 +2163,7 @@ function lookLine(){
   if(S.mess.length >= 3) ctx = ctx.concat(LINES.mess.many);
   else if(S.mess.length >= 1) ctx = ctx.concat(LINES.mess.some);
   if(S.weight == null) ctx = ctx.concat(L.noWeight);
-  if(S.streak >= 3) ctx = ctx.concat(L.streak.map(function(t){ return t.replace("{n}", S.streak); }));
+
   if(S.shape === "chubby" || S.shape === "toomuch") ctx.push(LINES.shape[S.shape]);
   // 6割は今の状況に刺さるセリフ、4割は汎用からランダム
   return noRepeat((Math.random() < 0.6 && ctx.length) ? ctx : L.any);
