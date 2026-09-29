@@ -111,3 +111,33 @@ export async function optimizeGlb({ input, output, wanted, maxTextureSize = 1024
   await io.write(output, doc);
   return { before, after, clipMap, headBone, lines };
 }
+
+/**
+ * 同じリグの GLB を何本か受け取り、1本目にほかのアニメを足して1つにする（骨は名前で対応付ける）。
+ * @param {{file:string, name:string}[]} parts
+ */
+export async function mergeAnimations(parts, output) {
+  const io = await makeIO();
+  const base = await io.read(parts[0].file);
+  const nodes = new Map(base.getRoot().listNodes().map((n) => [n.getName(), n]));
+  const buffer = base.getRoot().listBuffers()[0] || base.createBuffer();
+  const keep = base.getRoot().listAnimations();
+  if (keep.length !== 1) throw new Error(`${parts[0].file}: アニメが ${keep.length} 本（1本のはず）`);
+  keep[0].setName(parts[0].name);
+  for (const part of parts.slice(1)) {
+    const doc = await io.read(part.file);
+    const anims = doc.getRoot().listAnimations();
+    if (anims.length !== 1) throw new Error(`${part.file}: アニメが ${anims.length} 本（1本のはず）`);
+    const out = base.createAnimation(part.name);
+    for (const ch of anims[0].listChannels()) {
+      const target = nodes.get(ch.getTargetNode()?.getName());
+      if (!target) throw new Error(`${part.file}: 骨 ${ch.getTargetNode()?.getName()} が1本目にありません（別のリグ？）`);
+      const sm = ch.getSampler();
+      const copy = (acc) => base.createAccessor().setType(acc.getType()).setArray(acc.getArray().slice()).setBuffer(buffer);
+      const sampler = base.createAnimationSampler().setInput(copy(sm.getInput())).setOutput(copy(sm.getOutput())).setInterpolation(sm.getInterpolation());
+      out.addSampler(sampler).addChannel(base.createAnimationChannel().setTargetNode(target).setTargetPath(ch.getTargetPath()).setSampler(sampler));
+    }
+  }
+  await io.write(output, base);
+  return base.getRoot().listAnimations().map((a) => a.getName());
+}

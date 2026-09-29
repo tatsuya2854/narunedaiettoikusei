@@ -68,7 +68,8 @@ export class MockTripoProvider {
     if (t.type === "image_to_model" || t.type === "multiview_to_model") buf = await buildMockGlb({ rigged: false });
     else if (t.type === "animate_rig") buf = await buildMockGlb({ rigged: true });
     else if (t.type === "animate_retarget") {
-      const clips = t.input.animations.map((a) => PRESET[a.replace(/^preset:(biped:)?/, "")] || "idle");
+      // 本物の Tripo と同じく、複数頼んでも最後の1本しか入れない（2026-09-29 実測の挙動）
+      const clips = t.input.animations.slice(-1).map((a) => PRESET[a.replace(/^preset:(biped:)?/, "")] || "idle");
       buf = await buildMockGlb({ rigged: true, clips });
       // 本物で「クリップ名がプリセット名どおりか」は未確認なので、モックはあえて汎用名にして取り込み側の対応付けを試す
       buf = renameClips(buf, clips.map((_, i) => `Animation_${i}`));

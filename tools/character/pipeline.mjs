@@ -5,7 +5,7 @@
 //   generate  画像 → 3Dモデル候補を1つ作る                                有料
 //   ── ここで止まる（HUMAN CHECKPOINT: review で人が Approve / Reject） ──
 //   rig       Approve されたモデルだけ骨を入れる（事前チェックは無料）      有料
-//   animate   idle / walk / jump / happy を当てる（1タスクにまとめる）      有料
+//   animate   idle / walk / jump / cheer を1本ずつ当てて1ファイルにまとめる  有料
 //   optimize  Web 向けに軽くする                                          無料
 //   register  character.json と index.json に登録してゲームから読めるようにする
 import { copyFile, mkdir, access, readdir } from "node:fs/promises";
@@ -14,7 +14,7 @@ import sharp from "sharp";
 import { ROOT, CHAR_DIR, charPaths } from "./lib/paths.mjs";
 import { loadPipeline, savePipeline, readJson, writeJson } from "./lib/state.mjs";
 import { logFailure } from "./lib/guard.mjs";
-import { optimizeGlb, makeIO } from "./lib/optimize.mjs";
+import { optimizeGlb, makeIO, mergeAnimations } from "./lib/optimize.mjs";
 import { removeSideLines } from "./lib/line-cleanup.mjs";
 
 const exists = (p) => access(p).then(() => true, () => false);
@@ -128,8 +128,8 @@ async function runPaidTask({ P, p, guard, provider, slot, plan, start, estimate,
 
 function resetDownstream(p) {
   // 新しい候補・別の候補の採用に切り替えたら、前の候補から作った骨・アニメ・最適化は使えない
-  for (const k of ["prerigcheck", "rig", "retarget"]) delete p.tasks[k];
-  delete p.animatedFile; delete p.animatedFrom; delete p.requestedAnimations; delete p.optimized;
+  for (const k of Object.keys(p.tasks)) if (["prerigcheck", "rig", "retarget"].includes(k.split(":")[0])) delete p.tasks[k];
+  delete p.retargetFiles; delete p.animatedFile; delete p.animatedFrom; delete p.requestedAnimations; delete p.optimized;
 }
 
 export async function generate({ id, guard, provider, newCandidate = false, allowRecreate = false }) {
@@ -246,22 +246,55 @@ export async function rig({ id, guard, provider, force = false, allowRecreate = 
   console.log(`リグ済みモデル: ${rel(join(P.animations, `${rec.taskId}_rigged.glb`))}`);
 }
 
+async function checkRetarget(file, firstFile) {
+  const io = await makeIO();
+  const doc = await io.read(file);
+  const anims = doc.getRoot().listAnimations();
+  if (anims.length !== 1) throw new Error(`${rel(file)}: アニメが ${anims.length} 本（1本のはず）。ここで止めます（残りの動きは頼んでいません）`);
+  if (file === firstFile) return;
+  const first = new Set((await io.read(firstFile)).getRoot().listNodes().map((n) => n.getName()));
+  const missing = anims[0].listChannels().map((c) => c.getTargetNode()?.getName()).filter((n) => !first.has(n));
+  if (missing.length) throw new Error(`${rel(file)}: 1本目に無い骨 ${[...new Set(missing)].slice(0, 5).join(", ")}。ここで止めます`);
+}
+
+// Tripo の retarget は animations に複数入れても、返ってくる GLB には最後の1本しか入っていなかった
+// （2026-09-29 実測。4本ぶん 40 クレジット消費して cheer だけ）。なので1タスク1本で頼み、手元で1ファイルにまとめる
 export async function animate({ id, guard, provider, allowRecreate = false }) {
   const P = charPaths(id), cfg = await loadCfg(P), g = cfg.generation, p = await loadPipeline(P);
   requireApproved(p, id);
   if (p.tasks.rig?.status !== "success") throw new Error("先に rig してください");
-  const animations = Object.values(g.animations);
-  const est = provider.estimate("animate_retarget", { animations });
-  const rec = await runPaidTask({ P, p, guard, provider, allowRecreate, slot: "retarget", estimate: est,
-    plan: { title: `${cfg.name}: アニメーションを当てる（1タスクにまとめる）`, items: [{ label: `animate_retarget ${animations.join(", ")}`, credits: est }] },
-    start: () => provider.startRetarget({ rigTaskId: p.tasks.rig.taskId, animations }) });
-  if (!rec) return;
-  const dest = join(P.animations, `${rec.taskId}_animated.glb`);
-  if (!(await exists(dest))) await provider.downloadOutput(rec.taskId, "model", dest);
-  p.animatedFile = rel(dest); p.requestedAnimations = g.animations; p.stage = "animated";
-  p.animatedFrom = { model: p.review.taskId, rig: p.tasks.rig.taskId, retarget: rec.taskId };
+  // 旧方式（まとめて1タスク）の結果は、実際に入っていた最後の1本として引き継ぐ（作り直さない）
+  const states = Object.keys(g.animations);
+  if (p.tasks.retarget && !p.tasks[`retarget:${states.at(-1)}`] && p.tasks.retarget.status === "success") {
+    p.tasks[`retarget:${states.at(-1)}`] = { ...p.tasks.retarget, note: "まとめて頼んだタスク。中身は最後の1本だけ" };
+    p.retargetFiles ??= {};
+    if (p.animatedFile) p.retargetFiles[states.at(-1)] = p.animatedFile;
+    delete p.tasks.retarget;
+    await savePipeline(P, p);
+  }
+  p.retargetFiles ??= {};
+  for (const state of states) {
+    const anim = g.animations[state], slot = `retarget:${state}`;
+    const est = provider.estimate("animate_retarget", { animations: [anim] });
+    const rec = await runPaidTask({ P, p, guard, provider, allowRecreate, slot, estimate: est,
+      plan: { title: `${cfg.name}: 動き「${state}」を当てる`, items: [{ label: `animate_retarget ${anim}`, credits: est }] },
+      start: () => provider.startRetarget({ rigTaskId: p.tasks.rig.taskId, animations: [anim] }) });
+    if (!rec) return;
+    const dest = join(ROOT, p.retargetFiles[state] || rel(join(P.animations, `${rec.taskId}_${state.toLowerCase()}.glb`)));
+    if (!(await exists(dest))) await provider.downloadOutput(rec.taskId, "model", dest);
+    p.retargetFiles[state] = rel(dest);
+    await savePipeline(P, p);
+    // 次の有料タスクを頼む前に中身を確かめる（1本だけ入っているか・骨が1本目と同じか）。おかしければここで止める
+    await checkRetarget(dest, join(ROOT, p.retargetFiles[states[0]]));
+  }
+  // 1つの GLB にまとめる。クリップ名はプリセット名（idle / walk / jump / cheer）にしておく
+  const merged = join(P.animations, `${p.tasks.rig.taskId}_merged.glb`);
+  const names = Object.fromEntries(states.map((s) => [s, g.animations[s].replace(/^preset:(biped:)?/, "")]));
+  await mergeAnimations(states.map((s) => ({ file: join(ROOT, p.retargetFiles[s]), name: names[s] })), merged);
+  p.animatedFile = rel(merged); p.requestedAnimations = g.animations; p.stage = "animated";
+  p.animatedFrom = { model: p.review.taskId, rig: p.tasks.rig.taskId, retarget: states.map((s) => p.tasks[`retarget:${s}`].taskId) };
   await savePipeline(P, p);
-  console.log(`アニメ付きモデル: ${rel(dest)}`);
+  console.log(`アニメ付きモデル（${states.length}本をまとめた）: ${rel(merged)}`);
 }
 
 export async function optimize({ id }) {
@@ -304,7 +337,7 @@ export async function register({ id }) {
 
 /** 作成の返事を受け取れなかったタスクを、Tripo 側で見つけたIDで引き取る（作り直さない） */
 export async function adopt({ id, slot, taskId }) {
-  if (!["multiview", "model", "prerigcheck", "rig", "retarget"].includes(slot)) throw new Error("--slot は multiview / model / prerigcheck / rig / retarget");
+  if (!["multiview", "model", "prerigcheck", "rig", "retarget"].includes(String(slot).split(":")[0])) throw new Error("--slot は multiview / model / prerigcheck / rig / retarget:<状態>（例 retarget:WALK）");
   if (!taskId) throw new Error("--task <taskId> が必要です");
   const P = charPaths(id), p = await loadPipeline(P);
   p.tasks[slot] = { taskId, status: "queued", adoptedAt: now() };

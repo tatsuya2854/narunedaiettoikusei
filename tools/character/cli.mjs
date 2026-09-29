@@ -70,7 +70,7 @@ async function build() {
     if (p.review?.decision !== "approved") return;   // HUMAN CHECKPOINT。ここから先は Approve の後
   }
   if (p.tasks.rig?.status !== "success") { await pl.rig(c); p = await loadPipeline(P); if (p.tasks.rig?.status !== "success") return; }
-  if (p.tasks.retarget?.status !== "success") { await pl.animate(c); p = await loadPipeline(P); if (p.tasks.retarget?.status !== "success") return; }
+  if (p.stage !== "animated" && p.stage !== "optimized" && p.stage !== "registered") { await pl.animate(c); p = await loadPipeline(P); if (p.stage !== "animated") return; }
   await pl.optimize({ id });
   await pl.register({ id });
   console.log(`\n完了: ${id}（今回の実行で見積もり ${c.guard.spentThisRun} クレジット）`);
