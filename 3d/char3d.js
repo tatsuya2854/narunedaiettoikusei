@@ -5,7 +5,7 @@
 import * as T from "./vendor/three-char.js";
 import { AnimationStateMachine } from "./state-machine.js";
 
-const FIT_H = 0.74;          // キャラの背丈が描画枠の高さに占める割合（2D の FIT に見た目を合わせた値）
+const FIT_H = 0.82;          // キャラの背丈が描画枠の高さに占める割合（2D の FIT に見た目を合わせた値）
 const SLOW_MS = 45;          // これより遅いフレームが続いたら2Dへ
 
 export async function mount({ host, base = "./", characterId, reduced = false, onFail = () => {} }) {
@@ -24,8 +24,9 @@ export async function mount({ host, base = "./", characterId, reduced = false, o
   renderer.setClearColor(0x000000, 0);
 
   const scene = new T.Scene();
-  scene.add(new T.HemisphereLight(0xffffff, 0xcdbfb3, 2.4));
-  const key = new T.DirectionalLight(0xffffff, 1.3); key.position.set(0.6, 2, 2.4); scene.add(key);
+  // 元絵はフラットな塗りなので、影は弱め・全体を明るく（肌の色が元絵から離れないように）
+  scene.add(new T.HemisphereLight(0xffffff, 0xd8cabd, 3.0));
+  const key = new T.DirectionalLight(0xffffff, 0.8); key.position.set(0.5, 2, 3); scene.add(key);
   const cam = new T.PerspectiveCamera(20, 1, 0.01, 100);
 
   const loader = new T.GLTFLoader().setMeshoptDecoder(T.MeshoptDecoder);

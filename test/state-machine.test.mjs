@@ -72,3 +72,12 @@ test("クリップが1つも無くても落ちない", () => {
   sm.trigger("JUMP"); sm.tick(5);
   assert.equal(sm.resolve("JUMP"), null);
 });
+
+test("長いワンショット（cheer 12秒など）はゲームの演出に合わせて切り上げる", () => {
+  const { sm } = rig({ IDLE: "idle", HAPPY: "cheer" }, { idle: 15, cheer: 12.1 });
+  sm.trigger("HAPPY", 1.3);
+  sm.tick(2.0); assert.equal(sm.current, "HAPPY");
+  sm.tick(1.0); assert.equal(sm.current, "IDLE");
+  sm.trigger("HAPPY");
+  sm.tick(4.0); assert.equal(sm.current, "IDLE");
+});

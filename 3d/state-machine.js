@@ -77,7 +77,10 @@ export class AnimationStateMachine {
   trigger(state, minSec = 0) {
     if (BASE_STATES.includes(state)) { this.setBase(state); return; }
     const dur = this._play(state, false);
-    this.oneShotLeft = Math.max(dur - this.fade, minSec, 0.01);
+    // Tripo のプリセットには長いもの（cheer は12秒）があるので、ゲームの演出に合わせて切り上げる。
+    // ゲームが長さを渡したらそれ以上・最長3秒、渡さなければ最長4秒
+    const len = Math.min(dur, minSec > 0 ? Math.max(minSec, 3) : 4);
+    this.oneShotLeft = Math.max(len - this.fade, minSec, 0.01);
   }
 
   /** 毎フレーム呼ぶ。ワンショットが終わったらベースへ戻す */
