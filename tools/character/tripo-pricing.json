@@ -1,0 +1,18 @@
+{
+  "_note": "Tripo API（v2）のクレジット消費。推測で書かない。変わったらここだけ直す。1 credit = $0.01",
+  "checkedAt": "2026-09-29",
+  "sources": [
+    "https://platform.tripo3d.ai/docs/other/billing.md",
+    "https://platform.tripo3d.ai/docs/endpoint/animation.md",
+    "https://developers.tripo3d.ai/en/pricing"
+  ],
+  "image_to_model": { "untextured": 20, "textured": 30 },
+  "image_to_model_P1": { "untextured": 40, "textured": 50 },
+  "multiview_to_model": { "untextured": 20, "textured": 30 },
+  "texture_quality_addon": { "standard": 0, "detailed": 10, "extreme": 20 },
+  "geometry_quality_addon": { "standard": 0, "detailed": 20 },
+  "generate_multiview_image": 10,
+  "animate_prerigcheck": 0,
+  "animate_rig": 25,
+  "animate_retarget_per_animation": 10
+}

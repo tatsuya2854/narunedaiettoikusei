@@ -1,0 +1,253 @@
+// キャラクター3D化パイプラインの各段階。CLI（cli.mjs）から1キャラずつ呼ぶ。
+//
+//   init      元画像を source/<id>/ に置き、character.json を作る（元画像は上書きしない）
+//   prepare   3D化に渡す入力画像を作る（余白・正方形・サイズ）              無料
+//   generate  画像 → 3Dモデル候補を1つ作る                                有料
+//   ── ここで止まる（HUMAN CHECKPOINT: review で人が Approve / Reject） ──
+//   rig       Approve されたモデルだけ骨を入れる（事前チェックは無料）      有料
+//   animate   idle / walk / jump / happy を当てる（1タスクにまとめる）      有料
+//   optimize  Web 向けに軽くする                                          無料
+//   register  character.json と index.json に登録してゲームから読めるようにする
+import { copyFile, mkdir, access, readdir } from "node:fs/promises";
+import { join, relative, extname } from "node:path";
+import sharp from "sharp";
+import { ROOT, CHAR_DIR, charPaths } from "./lib/paths.mjs";
+import { loadPipeline, savePipeline, readJson, writeJson } from "./lib/state.mjs";
+import { logFailure } from "./lib/guard.mjs";
+import { optimizeGlb } from "./lib/optimize.mjs";
+
+const exists = (p) => access(p).then(() => true, () => false);
+const rel = (p) => relative(ROOT, p);
+const now = () => new Date().toISOString();
+
+export const DEFAULT_GENERATION = {
+  modelVersion: "v3.1-20260211",
+  texture: true, pbr: false, textureQuality: "standard",
+  faceLimit: 20000,
+  multiview: false,
+  rigType: "biped", rigVersion: "v1.0-20240301",
+  // 状態 → Tripo のプリセット（rig v1.0 biped の一覧から）。1タスク最大5本
+  animations: { IDLE: "preset:idle", WALK: "preset:walk", JUMP: "preset:jump", HAPPY: "preset:cheer" },
+};
+
+export async function init({ id, name, source }) {
+  const P = charPaths(id);
+  const ext = extname(source).toLowerCase();
+  const dest = join(P.source, `front${ext}`);
+  if (await exists(dest)) console.log(`元画像はもうあります（上書きしません）: ${rel(dest)}`);
+  else { await mkdir(P.source, { recursive: true }); await copyFile(source, dest); console.log(`元画像を置きました: ${rel(dest)}`); }
+  let cfg = await readJson(P.config, null);
+  if (!cfg) {
+    cfg = {
+      characterId: id, name: name || id, version: 0,
+      sourceImage: rel(dest),
+      model: null, animations: {},
+      scale: 1, position: [0, 0, 0], rotation: [0, 0, 0],
+      sockets: {},
+      generation: DEFAULT_GENERATION,
+      optimize: { maxTextureSize: 1024, maxTriangles: 15000 },
+      createdAt: now(), updatedAt: now(),
+    };
+    await writeJson(P.config, cfg);
+    console.log(`設定を作りました: ${rel(P.config)}`);
+  }
+  const p = await loadPipeline(P); p.stage ??= "initialized"; await savePipeline(P, p);
+  return cfg;
+}
+
+async function loadCfg(P) {
+  const cfg = await readJson(P.config, null);
+  if (!cfg) throw new Error(`${rel(P.config)} がありません。先に init してください`);
+  cfg.generation = { ...DEFAULT_GENERATION, ...cfg.generation };
+  return cfg;
+}
+
+export async function prepare({ id }) {
+  const P = charPaths(id), cfg = await loadCfg(P);
+  const src = join(ROOT, cfg.sourceImage);
+  const out = join(P.source, "input.png");   // 派生物。front.* は触らない
+  const t = await sharp(src).ensureAlpha().trim({ threshold: 1 }).toBuffer({ resolveWithObject: true });
+  const side = Math.round(Math.max(t.info.width, t.info.height) * 1.15);
+  const img = await sharp({ create: { width: side, height: side, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } })
+    .composite([{ input: t.data, left: Math.round((side - t.info.width) / 2), top: Math.round((side - t.info.height) / 2) }])
+    .png().toBuffer();
+  const size = Math.min(1024, Math.max(side, 512));   // 公式推奨は 256px 以上。拡大しすぎず、1024 で頭打ち
+  await sharp(img).resize(size, size, { kernel: "lanczos3" }).png().toFile(out);
+  const p = await loadPipeline(P); p.stage = "prepared"; p.input = rel(out); await savePipeline(P, p);
+  console.log(`入力画像: ${rel(out)}（${size}x${size}、元 ${t.info.width}x${t.info.height}）`);
+}
+
+/** 有料タスクを1つ流す共通処理。作った瞬間に taskId を保存し、再実行時は作らずに待つだけにする */
+async function runPaidTask({ P, p, guard, provider, slot, plan, start, estimate }) {
+  const existing = p.tasks[slot];
+  if (existing && !["failed", "banned", "expired", "cancelled", "unknown"].includes(existing.status)) {
+    if (existing.status === "success") return existing;
+    console.log(`前回作ったタスク ${existing.taskId} の結果を待ちます（新しく作りません）`);
+  } else {
+    if (existing) console.log(`前回のタスクは ${existing.status} でした（ログ参照）。人の確認のうえで作り直します`);
+    if (!(await guard.approve(plan))) return null;
+    let taskId;
+    try { taskId = await start(); }
+    catch (e) { const log = await logFailure(P.id, slot, e); console.error(`✗ タスクを作れませんでした。自動では再実行しません。ログ: ${rel(log)}`); throw e; }
+    p.tasks[slot] = { taskId, status: "queued", createdAt: now(), estimate };
+    guard.charge(estimate);
+    await savePipeline(P, p);
+    console.log(`タスクを作りました: ${taskId}`);
+  }
+  const rec = p.tasks[slot];
+  const r = await provider.waitTask(rec.taskId, { onProgress: (s, pr) => process.stdout.write(`\r  ${slot}: ${s} ${pr ?? ""}%   `) });
+  process.stdout.write("\n");
+  rec.status = r.status; rec.finishedAt = now(); rec.consumedCredits = r.consumedCredits;
+  if (r.consumedCredits) { p.credits.spent += r.consumedCredits; p.credits.log.push({ slot, taskId: rec.taskId, credits: r.consumedCredits, at: now() }); }
+  rec.output = r.output;
+  await savePipeline(P, p);
+  if (r.status !== "success") {
+    const log = await logFailure(P.id, slot, `task ${rec.taskId} status=${r.status}`, { raw: r.raw });
+    throw new Error(`${slot} が ${r.status} で終わりました（失敗時のクレジットは返金される仕様）。自動では再実行しません。ログ: ${rel(log)}`);
+  }
+  return rec;
+}
+
+export async function generate({ id, guard, provider, newCandidate = false }) {
+  const P = charPaths(id), cfg = await loadCfg(P), g = cfg.generation;
+  const p = await loadPipeline(P);
+  if (p.review?.decision === "approved" && !newCandidate) {
+    console.log(`採用済みのモデル（${p.review.taskId}）があります。作り直すなら --new を付けてください`); return;
+  }
+  const pending = p.candidates.find((c) => !c.decision);
+  if (pending && !newCandidate) {
+    console.log(`まだ確認していない候補があります: ${pending.taskId}\n→ npm run character:review -- ${id}`); return;
+  }
+  if (newCandidate && p.tasks.model?.status === "success") { p.tasks = {}; p.review = null; }
+  if (!p.input) throw new Error("入力画像がありません。先に prepare してください");
+
+  let file;
+  const opts = { modelVersion: g.modelVersion, texture: g.texture, pbr: g.pbr, textureQuality: g.textureQuality, geometryQuality: "standard" };
+  if (g.multiview) {
+    const est = provider.estimate("generate_multiview_image");
+    file ??= await provider.uploadImage(join(ROOT, p.input));
+    const mv = await runPaidTask({ P, p, guard, provider, slot: "multiview", estimate: est,
+      plan: { title: `${cfg.name}: 正面1枚 → 4視点画像（確認用に保存）`, items: [{ label: "generate_multiview_image", credits: est }] },
+      start: () => provider.startGenerateMultiview({ file }) });
+    if (!mv) return;
+    for (const v of ["front", "left", "back", "right"]) await provider.downloadOutput(mv.taskId, `generate_multiview_image.${v}_view_url`, join(P.multiview, `${mv.taskId}_${v}.png`));
+    console.log(`4視点画像: ${rel(P.multiview)}（正面がSource of Truth。顔や服が変わっていないか目で確認）`);
+  }
+  const op = g.multiview ? "multiview_to_model" : "image_to_model";
+  const est = provider.estimate(op, opts);
+  const rec = await runPaidTask({ P, p, guard, provider, slot: "model", estimate: est,
+    plan: { title: `${cfg.name}: ${g.multiview ? "4視点" : "正面画像"} → 3Dモデル候補 1体`, items: [{ label: `${op} ${g.modelVersion} テクスチャ=${g.textureQuality} 面数上限=${g.faceLimit}`, credits: est }] },
+    start: async () => {
+      if (g.multiview) return provider.startMultiviewToModel({ originalTaskId: p.tasks.multiview.taskId, ...opts, faceLimit: g.faceLimit });
+      const f = await provider.uploadImage(join(ROOT, p.input));
+      return provider.startImageToModel({ file: f, ...opts, faceLimit: g.faceLimit });
+    } });
+  if (!rec) return;
+  const dest = join(P.models, `${rec.taskId}.glb`);
+  if (!(await exists(dest))) await provider.downloadOutput(rec.taskId, rec.output.pbr_model ? "pbr_model" : "model", dest);
+  if (rec.output.rendered_image && !(await exists(join(P.models, `${rec.taskId}.webp`)))) {
+    await provider.downloadOutput(rec.taskId, "rendered_image", join(P.models, `${rec.taskId}.webp`)).catch(() => {});
+  }
+  if (!p.candidates.some((c) => c.taskId === rec.taskId)) p.candidates.push({ taskId: rec.taskId, file: rel(dest), createdAt: now(), decision: null });
+  p.stage = "generated";
+  await savePipeline(P, p);
+  console.log(`\n3Dモデル候補: ${rel(dest)}\n★ ここで止まります。人が確認してください → npm run character:review -- ${id}`);
+}
+
+export async function decide({ id, taskId, decision, note = "", reviewer = process.env.USER || "human" }) {
+  const P = charPaths(id), p = await loadPipeline(P);
+  const c = taskId ? p.candidates.find((x) => x.taskId === taskId) : p.candidates.findLast((x) => !x.decision) || p.candidates.at(-1);
+  if (!c) throw new Error("確認する候補がありません");
+  if (!["approved", "rejected"].includes(decision)) throw new Error("decision は approved / rejected");
+  c.decision = decision; c.note = note; c.reviewer = reviewer; c.decidedAt = now();
+  if (decision === "approved") { p.review = { taskId: c.taskId, decision, note, reviewer, at: c.decidedAt }; p.stage = "approved"; }
+  else if (p.review?.taskId === c.taskId) { p.review = null; p.stage = "rejected"; }
+  else p.stage = p.review ? p.stage : "rejected";
+  await savePipeline(P, p);
+  console.log(`${c.taskId} を ${decision === "approved" ? "採用（Approve）" : "不採用（Reject）"} にしました${note ? `: ${note}` : ""}`);
+  return c;
+}
+
+function requireApproved(p, id) {
+  if (p.review?.decision !== "approved") throw new Error(`採用（Approve）されたモデルがありません。リグ・アニメは Approve の後だけ流せます → npm run character:review -- ${id}`);
+  // 採用したモデルと、tasks.model が同じものかを確認（別の候補に骨を入れない）
+  if (p.tasks.model?.taskId !== p.review.taskId) throw new Error(`採用したモデル ${p.review.taskId} と最新の生成タスクが違います。status で確認してください`);
+}
+
+export async function rig({ id, guard, provider, force = false }) {
+  const P = charPaths(id), cfg = await loadCfg(P), g = cfg.generation, p = await loadPipeline(P);
+  requireApproved(p, id);
+  if (p.tasks.rig?.status === "success") { console.log("リグ済みです"); return; }
+  const modelTaskId = p.review.taskId;
+  // 事前チェックは無料（公式）。false でも「できない」とは限らない（公式）ので、止めて人に判断を返す
+  const chk = await runPaidTask({ P, p, guard, provider, slot: "prerigcheck", estimate: 0,
+    plan: { title: `${cfg.name}: 骨を入れられるかの事前チェック`, items: [{ label: "animate_prerigcheck", credits: provider.estimate("animate_prerigcheck") }] },
+    start: () => provider.startPrerigCheck({ modelTaskId }) });
+  if (!chk) return;
+  console.log(`事前チェック: riggable=${chk.output.riggable} rig_type=${chk.output.rig_type}`);
+  if (!chk.output.riggable && !force) { console.log("骨を入れられない判定です。モデルを見直すか、--force で試してください（有料）"); return; }
+  const est = provider.estimate("animate_rig");
+  const rec = await runPaidTask({ P, p, guard, provider, slot: "rig", estimate: est,
+    plan: { title: `${cfg.name}: 骨（リグ）を入れる`, items: [{ label: `animate_rig ${g.rigType} ${g.rigVersion} spec=tripo`, credits: est }] },
+    start: () => provider.startRig({ modelTaskId, rigType: chk.output.rig_type || g.rigType, modelVersion: g.rigVersion }) });
+  if (!rec) return;
+  await provider.downloadOutput(rec.taskId, "model", join(P.animations, `${rec.taskId}_rigged.glb`));
+  p.stage = "rigged"; await savePipeline(P, p);
+  console.log(`リグ済みモデル: ${rel(join(P.animations, `${rec.taskId}_rigged.glb`))}`);
+}
+
+export async function animate({ id, guard, provider }) {
+  const P = charPaths(id), cfg = await loadCfg(P), g = cfg.generation, p = await loadPipeline(P);
+  requireApproved(p, id);
+  if (p.tasks.rig?.status !== "success") throw new Error("先に rig してください");
+  const animations = Object.values(g.animations);
+  const est = provider.estimate("animate_retarget", { animations });
+  const rec = await runPaidTask({ P, p, guard, provider, slot: "retarget", estimate: est,
+    plan: { title: `${cfg.name}: アニメーションを当てる（1タスクにまとめる）`, items: [{ label: `animate_retarget ${animations.join(", ")}`, credits: est }] },
+    start: () => provider.startRetarget({ rigTaskId: p.tasks.rig.taskId, animations }) });
+  if (!rec) return;
+  const dest = join(P.animations, `${rec.taskId}_animated.glb`);
+  if (!(await exists(dest))) await provider.downloadOutput(rec.taskId, "model", dest);
+  p.animatedFile = rel(dest); p.requestedAnimations = g.animations; p.stage = "animated";
+  await savePipeline(P, p);
+  console.log(`アニメ付きモデル: ${rel(dest)}`);
+}
+
+export async function optimize({ id }) {
+  const P = charPaths(id), cfg = await loadCfg(P), p = await loadPipeline(P);
+  if (!p.animatedFile) throw new Error("先に animate してください");
+  const out = join(P.optimized, `${id}.glb`);
+  await mkdir(P.optimized, { recursive: true });
+  const r = await optimizeGlb({ input: join(ROOT, p.animatedFile), output: out, wanted: p.requestedAnimations, ...cfg.optimize });
+  const { size } = await import("node:fs/promises").then((m) => m.stat(out));
+  p.optimized = { file: rel(out), bytes: size, before: r.before, after: r.after, clipMap: r.clipMap, headBone: r.headBone, at: now() };
+  p.stage = "optimized"; await savePipeline(P, p);
+  console.log(`最適化: ${rel(out)} ${(size / 1024).toFixed(0)}KB  三角形 ${r.before.triangles}→${r.after.triangles}  テクスチャ ${JSON.stringify(r.after.textures.map((t) => t.size))}  クリップ ${JSON.stringify(r.clipMap)}  頭の骨 ${r.headBone}`);
+}
+
+export async function register({ id }) {
+  const P = charPaths(id), cfg = await loadCfg(P), p = await loadPipeline(P);
+  if (!p.optimized) throw new Error("先に optimize してください");
+  cfg.model = p.optimized.file;
+  cfg.animations = p.optimized.clipMap;
+  if (p.optimized.headBone) cfg.sockets.head = { ...(cfg.sockets.head || {}), bone: p.optimized.headBone };
+  cfg.version = (cfg.version || 0) + 1;
+  cfg.provenance = { provider: p.tasks.model?.taskId?.startsWith("mock-") ? "mock" : "tripo", modelTask: p.review.taskId, rigTask: p.tasks.rig?.taskId, retargetTask: p.tasks.retarget?.taskId, approvedBy: p.review.reviewer, approvedAt: p.review.at };
+  cfg.updatedAt = now();
+  await writeJson(P.config, cfg);
+  const idxPath = join(CHAR_DIR, "index.json");
+  const idx = await readJson(idxPath, { characters: [] });
+  const entry = { id, config: rel(P.config), version: cfg.version, provider: cfg.provenance.provider };
+  idx.characters = idx.characters.filter((c) => c.id !== id).concat(entry);
+  idx.default ??= id;
+  await writeJson(idxPath, idx);
+  p.stage = "registered"; await savePipeline(P, p);
+  console.log(`ゲームに登録しました: ${rel(idxPath)} ← ${id} v${cfg.version}（${entry.provider}）`);
+}
+
+export async function status({ id }) {
+  const P = charPaths(id), p = await loadPipeline(P);
+  console.log(JSON.stringify({ stage: p.stage, review: p.review, candidates: p.candidates, tasks: Object.fromEntries(Object.entries(p.tasks).map(([k, v]) => [k, { taskId: v.taskId, status: v.status, credits: v.consumedCredits }])), creditsSpent: p.credits.spent, optimized: p.optimized && { file: p.optimized.file, bytes: p.optimized.bytes, tris: p.optimized.after.triangles } }, null, 2));
+}
+
+export { logFailure };

@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>3Dモデル確認</title>
+<style>
+  :root { --bg:#f6f4f1; --card:#fff; --ink:#2a2622; --sub:#7a716a; --line:#e7e1da; --ok:#2f8f5b; --ng:#c0473b; --accent:#e98f6f; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#1d1b19; --card:#282522; --ink:#f1ece6; --sub:#a79d94; --line:#3a3530; } }
+  * { box-sizing:border-box; }
+  body { margin:0; font:15px/1.6 system-ui,-apple-system,"Hiragino Sans",sans-serif; background:var(--bg); color:var(--ink); }
+  header { padding:16px 20px 4px; }
+  h1 { font-size:18px; margin:0; }
+  .sub { color:var(--sub); font-size:13px; }
+  main { display:grid; grid-template-columns: 1fr 1fr; gap:16px; padding:16px 20px; }
+  @media (max-width: 820px) { main { grid-template-columns:1fr; } }
+  .card { background:var(--card); border-radius:14px; box-shadow:0 1px 3px rgba(0,0,0,.08); padding:12px; }
+  .card h2 { font-size:14px; margin:0 0 8px; color:var(--sub); font-weight:600; }
+  .view { position:relative; aspect-ratio:1; border-radius:10px; overflow:hidden; background:repeating-conic-gradient(#0000000a 0 25%, transparent 0 50%) 0 0/24px 24px; }
+  .view img, .view canvas { position:absolute; inset:0; width:100%; height:100%; object-fit:contain; }
+  #overlay { opacity:0; pointer-events:none; transition:opacity .2s; }
+  .row { display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; }
+  button, select { font:inherit; border:0; border-radius:999px; padding:7px 14px; background:var(--line); color:var(--ink); cursor:pointer; }
+  button[aria-pressed="true"] { background:var(--ink); color:var(--card); }
+  button:disabled { opacity:.4; cursor:not-allowed; }
+  .ok { background:var(--ok); color:#fff; } .ng { background:var(--ng); color:#fff; }
+  .checks { display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); gap:4px 12px; margin:6px 0 10px; }
+  label { display:flex; gap:6px; align-items:center; }
+  textarea { width:100%; min-height:56px; font:inherit; border:1px solid var(--line); border-radius:10px; padding:8px; background:transparent; color:inherit; }
+  .decision { grid-column:1/-1; }
+  #msg { margin-left:8px; font-weight:600; }
+  .pill { display:inline-block; padding:1px 8px; border-radius:999px; font-size:12px; background:var(--line); }
+</style>
+<script type="importmap">{ "imports": { "three": "/node_modules/three/build/three.module.js", "three/addons/": "/node_modules/three/examples/jsm/" } }</script>
+</head>
+<body>
+<header>
+  <h1 id="title">3Dモデル確認</h1>
+  <div class="sub">元絵（正面）が正です。3D化で顔・服・色が変わっていたら Reject してください。Approve したモデルにだけ、骨とアニメ（有料）を流します。</div>
+</header>
+<main>
+  <section class="card">
+    <h2>元絵（Source of Truth）</h2>
+    <div class="view"><img id="src" alt="元絵"></div>
+  </section>
+  <section class="card">
+    <h2>3Dモデル候補 <span id="cand" class="pill"></span></h2>
+    <div class="view" id="view3d"><img id="overlay" alt=""></div>
+    <div class="row" id="views">
+      <button data-view="front" aria-pressed="true">正面</button><button data-view="left">左</button><button data-view="right">右</button><button data-view="back">後ろ</button><button data-view="top">上</button>
+      <button id="spin" aria-pressed="false">回す</button>
+      <button id="cmp" aria-pressed="false">元絵を重ねる</button>
+    </div>
+    <div class="row" id="clips"></div>
+    <div class="row"><select id="which"></select></div>
+  </section>
+  <section class="card decision">
+    <h2>確認項目（全部見たら Approve できます）</h2>
+    <div class="checks" id="checks"></div>
+    <textarea id="note" placeholder="気づいたこと（Reject の理由など）"></textarea>
+    <div class="row">
+      <button class="ok" id="approve" disabled>Approve（この3Dで進める）</button>
+      <button class="ng" id="reject">Reject（使わない）</button>
+      <span id="msg"></span>
+    </div>
+  </section>
+</main>
+<script type="module">
+import * as THREE from "three";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
+
+const ITEMS = ["顔", "目", "口", "髪型（ポニーテール）", "体型", "頭身", "服（黄シャツ・グレー短パン）", "色", "アクセ（耳付き帽子）", "雰囲気"];
+const checks = document.getElementById("checks");
+ITEMS.forEach((t) => { const l = document.createElement("label"); l.innerHTML = `<input type="checkbox"> ${t}`; checks.append(l); });
+checks.addEventListener("change", () => { document.getElementById("approve").disabled = [...checks.querySelectorAll("input")].some((i) => !i.checked); });
+
+const st = await (await fetch("/api/state")).json();
+document.getElementById("title").textContent = `3Dモデル確認：${st.name}（${st.id}）`;
+document.getElementById("src").src = "/" + st.sourceImage;
+document.getElementById("overlay").src = "/" + (st.input || st.sourceImage);
+
+// 候補（最新が先頭）。アニメ済み・最適化済みがあればそれも見られる
+const which = document.getElementById("which");
+const opts = [...st.candidates].reverse().map((c) => ({ label: `候補 ${c.taskId.slice(0, 13)}… ${c.decision ? `（${c.decision}）` : "（未確認）"}`, file: c.file, taskId: c.taskId }));
+if (st.animated) opts.unshift({ label: "アニメ付き（リグ後）", file: st.animated });
+if (st.optimized) opts.unshift({ label: "最適化後（ゲームで使うもの）", file: st.optimized });
+opts.forEach((o, i) => which.add(new Option(o.label, i)));
+
+const host = document.getElementById("view3d");
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+host.prepend(renderer.domElement);
+const scene = new THREE.Scene();
+scene.add(new THREE.HemisphereLight(0xffffff, 0xb8a898, 2.2));
+const sun = new THREE.DirectionalLight(0xffffff, 1.4); sun.position.set(1, 2, 3); scene.add(sun);
+const cam = new THREE.PerspectiveCamera(30, 1, 0.01, 100);
+const ctl = new OrbitControls(cam, renderer.domElement);
+const clock = new THREE.Clock();
+let root = null, mixer = null, radius = 1, center = new THREE.Vector3();
+
+function resize() { const r = host.getBoundingClientRect(); renderer.setSize(r.width, r.height, false); cam.aspect = r.width / r.height; cam.updateProjectionMatrix(); }
+new ResizeObserver(resize).observe(host);
+
+const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
+async function load(i) {
+  const o = opts[i]; if (!o) return;
+  document.getElementById("cand").textContent = o.taskId ? o.taskId : o.label;
+  const g = await loader.loadAsync("/" + o.file);
+  if (root) scene.remove(root);
+  root = g.scene; scene.add(root);
+  const box = new THREE.Box3().setFromObject(root); box.getCenter(center); radius = box.getSize(new THREE.Vector3()).length() / 2;
+  ctl.target.copy(center);
+  setView("front");
+  mixer = g.animations.length ? new THREE.AnimationMixer(root) : null;
+  const clips = document.getElementById("clips"); clips.innerHTML = "";
+  g.animations.forEach((c) => {
+    const b = document.createElement("button"); b.textContent = `▶ ${c.name}`;
+    b.onclick = () => { mixer.stopAllAction(); mixer.clipAction(c).reset().play(); };
+    clips.append(b);
+  });
+}
+function setView(v) {
+  const d = radius * 3.2, dir = { front: [0, 0, 1], back: [0, 0, -1], left: [1, 0, 0], right: [-1, 0, 0], top: [0, 1, 0.001] }[v];
+  cam.position.copy(center).add(new THREE.Vector3(...dir).multiplyScalar(d));
+  ctl.update();
+  document.querySelectorAll("#views [data-view]").forEach((b) => b.setAttribute("aria-pressed", b.dataset.view === v));
+}
+document.querySelectorAll("#views [data-view]").forEach((b) => (b.onclick = () => setView(b.dataset.view)));
+const spin = document.getElementById("spin");
+spin.onclick = () => { ctl.autoRotate = !ctl.autoRotate; spin.setAttribute("aria-pressed", ctl.autoRotate); };
+const cmp = document.getElementById("cmp");
+cmp.onclick = () => { const on = cmp.getAttribute("aria-pressed") !== "true"; cmp.setAttribute("aria-pressed", on); document.getElementById("overlay").style.opacity = on ? 0.45 : 0; if (on) setView("front"); };
+which.onchange = () => load(Number(which.value));
+
+renderer.setAnimationLoop(() => { const dt = clock.getDelta(); mixer?.update(dt); ctl.update(); renderer.render(scene, cam); });
+resize();
+await load(0);
+
+async function send(decision) {
+  const o = opts[Number(which.value)];
+  if (!o.taskId) { document.getElementById("msg").textContent = "判断するのは生成された候補です（上のリストで候補を選んでください）"; return; }
+  const r = await fetch("/api/decide", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ taskId: o.taskId, decision, note: document.getElementById("note").value }) });
+  const j = await r.json();
+  document.getElementById("msg").textContent = j.ok ? (decision === "approved" ? "Approve しました。ターミナルで build をもう一度流すと、リグ→アニメへ進みます" : "Reject しました。作り直すときは generate --new（有料）") : "失敗しました";
+}
+document.getElementById("approve").onclick = () => send("approved");
+document.getElementById("reject").onclick = () => send("rejected");
+</script>
+</body>
+</html>
