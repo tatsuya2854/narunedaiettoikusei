@@ -18,4 +18,11 @@ export async function writeJson(p, data) {
 export async function loadPipeline(paths) {
   return readJson(paths.pipeline, { characterId: paths.id, stage: null, tasks: {}, candidates: [], review: null, credits: { spent: 0, log: [] } });
 }
-export async function savePipeline(paths, p) { p.updatedAt = new Date().toISOString(); await writeJson(paths.pipeline, p); }
+export async function savePipeline(paths, p) {
+  p.updatedAt = new Date().toISOString();
+  // 出力のダウンロードURL（署名付き・数分で切れる）は残さない。公開リポジトリに載るため。必要なときはタスクを引き直す
+  for (const t of Object.values(p.tasks || {})) {
+    for (const [k, v] of Object.entries(t.output || {})) if (typeof v === "string" && /^https?:/.test(v)) t.output[k] = "(url)";
+  }
+  await writeJson(paths.pipeline, p);
+}

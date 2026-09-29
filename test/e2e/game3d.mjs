@@ -12,11 +12,12 @@ const root = resolve(new URL("../..", import.meta.url).pathname);
 const out = process.env.SHOT_DIR || null;
 const T = { ".html": "text/html", ".js": "text/javascript", ".json": "application/json", ".webp": "image/webp", ".png": "image/png", ".glb": "model/gltf-binary", ".svg": "image/svg+xml" };
 const server = createServer(async (q, r) => {
-  try { const p = join(root, decodeURIComponent(new URL(q.url, "http://x").pathname).replace(/\/$/, "/index.html")); if (!p.startsWith(root)) throw 0;
+  try { const p = join(root, decodeURIComponent(new URL(q.url, "http://x").pathname).replace(/\/$/, "/index.html")); if (!p.startsWith(root + "/") || /\/\./.test(p.slice(root.length))) throw 0;   // .env などは配らない
     r.writeHead(200, { "content-type": T[extname(p)] || "application/octet-stream" }); r.end(await readFile(p)); } catch { r.writeHead(404); r.end(); }
-}).listen(0);
+}).listen(0, "127.0.0.1");
+await new Promise((r) => server.once("listening", r));
 // BASE_URL を渡すと本番（GitHub Pages）を確かめる
-const base = process.env.BASE_URL || `http://localhost:${server.address().port}/index.html`;
+const base = process.env.BASE_URL || `http://127.0.0.1:${server.address().port}/index.html`;
 const browser = await chromium.launch({ args: ["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader"] });
 const iphone = devices["iPhone 13"];
 let failed = 0;

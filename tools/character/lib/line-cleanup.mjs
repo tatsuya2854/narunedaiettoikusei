@@ -66,6 +66,11 @@ export async function removeSideLines(doc, { forward = [1, 0, 0], keepFacing = 0
       // 線は「色味のない黒」。茶色の髪（暗いが色味がある）は消さない
       if ((l < dark && chroma < 45) || (l < 55 && chroma < 70)) { mask[i] = 1; count++; }
     }
+    // 太い黒い面（黒髪・黒い靴・黒い服など）はデザインなので消さない。細い線だけを残す（モルフォロジーの opening で太い塊を見つけて除外）
+    const r = Math.max(3, Math.round(W / 256));
+    const thick = dilate(erode(mask, W, H, r), W, H, r);
+    let kept = 0;
+    for (let i = 0; i < W * H; i++) if (mask[i] && thick[i]) { mask[i] = 0; count--; kept++; }
     // 線の縁の中間色（アンチエイリアス・JPEGのにじみ）も残らないよう、2画素ふくらませる
     let grow = mask.slice();
     for (let pass = 0; pass < 2; pass++) {
@@ -83,10 +88,14 @@ export async function removeSideLines(doc, { forward = [1, 0, 0], keepFacing = 0
     // 島の外の余白も埋める対象にする。境目で黒い余白が表面ににじむのを防ぐ（テクスチャのパディング）
     for (let i = 0; i < W * H; i++) if (!covered[i]) grow[i] = 1;
     inpaint(px, W, H, grow);
-    const buf = await sharp(px, { raw: { width: W, height: H, channels: 4 } }).removeAlpha()
-      .toFormat(tex.getMimeType() === "image/png" ? "png" : "jpeg", { quality: 95 }).toBuffer();
-    tex.setImage(new Uint8Array(buf));
-    report.push({ texture: `${W}x${H}`, removedPixels: count });
+    // 元の形式に合わせて書き戻す（PNG / WebP は透明を保つ。JPEG はそのまま）
+    const mime = tex.getMimeType();
+    let img2 = sharp(px, { raw: { width: W, height: H, channels: 4 } });
+    if (mime === "image/png") img2 = img2.png();
+    else if (mime === "image/webp") img2 = img2.webp({ quality: 95 });
+    else { img2 = img2.removeAlpha().jpeg({ quality: 95 }); tex.setMimeType("image/jpeg"); }
+    tex.setImage(new Uint8Array(await img2.toBuffer()));
+    report.push({ texture: `${W}x${H}`, removedPixels: count, keptThickPixels: kept });
   }
   return report;
 }
@@ -131,4 +140,25 @@ function inpaint(px, W, H, mask) {
     for (const [i, r, g, b] of fill) { const o = i * 4; px[o] = r; px[o + 1] = g; px[o + 2] = b; mask[i] = 0; }
     todo = next;
   }
+}
+
+// 正方形の窓での収縮・膨張（和の表を使って O(画素数)）
+function boxCount(m, W, H, r) {
+  const S = new Int32Array((W + 1) * (H + 1));
+  for (let y = 0; y < H; y++) { let row = 0; for (let x = 0; x < W; x++) { row += m[y * W + x]; S[(y + 1) * (W + 1) + x + 1] = S[y * (W + 1) + x + 1] + row; } }
+  return (x0, y0, x1, y1) => S[y1 * (W + 1) + x1] - S[y0 * (W + 1) + x1] - S[y1 * (W + 1) + x0] + S[y0 * (W + 1) + x0];
+}
+function erode(m, W, H, r) {
+  const q = boxCount(m, W, H, r), out = new Uint8Array(W * H);
+  for (let y = r; y < H - r; y++) for (let x = r; x < W - r; x++) {
+    if (q(x - r, y - r, x + r + 1, y + r + 1) === (2 * r + 1) ** 2) out[y * W + x] = 1;
+  }
+  return out;
+}
+function dilate(m, W, H, r) {
+  const q = boxCount(m, W, H, r), out = new Uint8Array(W * H);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    if (q(Math.max(0, x - r), Math.max(0, y - r), Math.min(W, x + r + 1), Math.min(H, y + r + 1)) > 0) out[y * W + x] = 1;
+  }
+  return out;
 }

@@ -14,7 +14,7 @@ import { ProviderError, RETARGET_MAX_PER_TASK } from "./provider.mjs";
 import { TripoApiProvider } from "./tripo-api.mjs";
 
 const BASE = "https://openapi.tripo3d.ai/v3";
-const FINAL = new Set(["success", "failed", "cancelled"]);
+const FINAL = new Set(["success", "failed", "cancelled", "banned", "expired", "unknown"]);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 // パイプラインは v2 の出力名（model / rendered_image）で扱っているので、v3 の名前から読み替える
 const OUT_KEY = { model: "model_url", pbr_model: "model_url", rendered_image: "rendered_image_url" };

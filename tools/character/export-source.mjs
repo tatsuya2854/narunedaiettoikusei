@@ -16,17 +16,18 @@ const types = { ".html": "text/html", ".webp": "image/webp", ".png": "image/png"
 const server = createServer(async (req, res) => {
   try {
     const p = join(root, decodeURIComponent(new URL(req.url, "http://x").pathname).replace(/\/$/, "/index.html"));
-    if (!p.startsWith(root)) throw 0;
+    if (!p.startsWith(root + "/") || /\/\./.test(p.slice(root.length))) throw 0;   // .env などは配らない
     res.writeHead(200, { "content-type": types[extname(p)] || "application/octet-stream" });
     res.end(await readFile(p));
   } catch { res.writeHead(404); res.end(); }
-}).listen(0);
+}).listen(0, "127.0.0.1");
+await new Promise((r) => server.once("listening", r));
 const port = server.address().port;
 
 const browser = await chromium.launch();
 try {
   const page = await browser.newPage({ viewport: { width: 420, height: 800 }, deviceScaleFactor: scale });
-  await page.goto(`http://localhost:${port}/index.html`);
+  await page.goto(`http://127.0.0.1:${port}/index.html`);
   await page.waitForFunction(() => window.__naru && window.__naru.gl && window.__naru.gl());
   await page.evaluate(() => {
     const n = window.__naru;
