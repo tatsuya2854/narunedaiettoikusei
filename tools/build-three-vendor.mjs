@@ -7,7 +7,7 @@ await build({
   stdin: {
     contents: `
       export { WebGLRenderer, Scene, PerspectiveCamera, HemisphereLight, DirectionalLight, AnimationMixer, LoopRepeat, LoopOnce,
-        Box3, Vector3, Mesh, CircleGeometry, MeshBasicMaterial, CanvasTexture, SRGBColorSpace, Clock, Color } from "three";
+        Box3, Vector3, Mesh, CircleGeometry, MeshBasicMaterial, CanvasTexture, SRGBColorSpace, Timer, Color } from "three";
       export { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
       export { MeshoptDecoder } from "three/examples/jsm/libs/meshopt_decoder.module.js";
       export const REVISION_VENDORED = ${JSON.stringify(v)};`,

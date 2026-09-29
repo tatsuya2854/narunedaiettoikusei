@@ -101,7 +101,7 @@ export async function mount({ host, base = "./", characterId, reduced = false, o
   const ro = window.ResizeObserver ? new ResizeObserver(fit) : null;
 
   // --- 描画ループ ---
-  const clock = new T.Clock();
+  const timer = new T.Timer();
   let api = null;
   let still = 0;
   let raf = 0, active = true, slow = 0, frames = 0, sum = 0;
@@ -118,10 +118,11 @@ export async function mount({ host, base = "./", characterId, reduced = false, o
     renderer.render(scene, cam);
   }
   const tmp = new T.Vector3();
-  function loop() {
+  function loop(ts) {
     raf = requestAnimationFrame(loop);
-    if (document.hidden) { clock.getDelta(); return; }
-    const dtRaw = clock.getDelta();
+    timer.update(ts);
+    if (document.hidden) return;
+    const dtRaw = timer.getDelta();
     const dt = Math.min(0.05, dtRaw);
     draw(dt);
     // 読み込み直後の数秒は除いて、遅いフレームが続くか見る
