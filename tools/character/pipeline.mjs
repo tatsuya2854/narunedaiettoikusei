@@ -78,17 +78,33 @@ export async function prepare({ id }) {
 }
 
 /** 有料タスクを1つ流す共通処理。作った瞬間に taskId を保存し、再実行時は作らずに待つだけにする */
-async function runPaidTask({ P, p, guard, provider, slot, plan, start, estimate }) {
+const RECREATABLE = ["failed", "banned", "expired", "cancelled", "unknown", "create_failed"];
+async function runPaidTask({ P, p, guard, provider, slot, plan, start, estimate, allowRecreate = false }) {
   const existing = p.tasks[slot];
-  if (existing && !["failed", "banned", "expired", "cancelled", "unknown"].includes(existing.status)) {
+  if (existing?.status === "creating" && !allowRecreate) {
+    // 前回、作成の POST を送ったが返事を受け取れなかった。Tripo 側ではできているかもしれない
+    throw new Error(`${slot}: 前回タスク作成の返事を受け取れずに終わっています（${existing.startedAt}）。Tripo 側にタスクがあるかもしれません。
+  → https://platform.tripo3d.ai でタスクを確認し、あれば: npm run character -- adopt ${P.id} --slot ${slot} --task <taskId>
+  → 無いと確認できたら: 同じコマンドに --allow-recreate を付けて再実行（有料）`);
+  }
+  if (existing && existing.status !== "creating" && !RECREATABLE.includes(existing.status)) {
     if (existing.status === "success") return existing;
     console.log(`前回作ったタスク ${existing.taskId} の結果を待ちます（新しく作りません）`);
   } else {
     if (existing) console.log(`前回のタスクは ${existing.status} でした（ログ参照）。人の確認のうえで作り直します`);
     if (!(await guard.approve(plan))) return null;
+    // POST の前に「作成中」を残す。返事の前に落ちても、次回むやみに作り直さない（二重課金を防ぐ）
+    p.tasks[slot] = { status: "creating", startedAt: now(), estimate };
+    await savePipeline(P, p);
     let taskId;
     try { taskId = await start(); }
-    catch (e) { const log = await logFailure(P.id, slot, e); console.error(`✗ タスクを作れませんでした。自動では再実行しません。ログ: ${rel(log)}`); throw e; }
+    catch (e) {
+      // HTTP の返事があった失敗 = 作られていない。返事が無い失敗（通信断など）= 作られたか分からないので「作成中」のまま
+      if (e.status) { p.tasks[slot] = { status: "create_failed", error: String(e.message).slice(0, 300), at: now() }; await savePipeline(P, p); }
+      const log = await logFailure(P.id, slot, e);
+      console.error(`✗ タスクを作れませんでした。自動では再実行しません。ログ: ${rel(log)}`);
+      throw e;
+    }
     p.tasks[slot] = { taskId, status: "queued", createdAt: now(), estimate };
     guard.charge(estimate);
     await savePipeline(P, p);
@@ -108,7 +124,13 @@ async function runPaidTask({ P, p, guard, provider, slot, plan, start, estimate 
   return rec;
 }
 
-export async function generate({ id, guard, provider, newCandidate = false }) {
+function resetDownstream(p) {
+  // 新しい候補・別の候補の採用に切り替えたら、前の候補から作った骨・アニメ・最適化は使えない
+  for (const k of ["prerigcheck", "rig", "retarget"]) delete p.tasks[k];
+  delete p.animatedFile; delete p.animatedFrom; delete p.requestedAnimations; delete p.optimized;
+}
+
+export async function generate({ id, guard, provider, newCandidate = false, allowRecreate = false }) {
   const P = charPaths(id), cfg = await loadCfg(P), g = cfg.generation;
   const p = await loadPipeline(P);
   if (p.review?.decision === "approved" && !newCandidate) {
@@ -118,7 +140,7 @@ export async function generate({ id, guard, provider, newCandidate = false }) {
   if (pending && !newCandidate) {
     console.log(`まだ確認していない候補があります: ${pending.taskId}\n→ npm run character:review -- ${id}`); return;
   }
-  if (newCandidate && p.tasks.model?.status === "success") { p.tasks = {}; p.review = null; }
+  if (newCandidate && p.tasks.model?.status === "success") { resetDownstream(p); p.tasks = {}; p.review = null; }
   if (!p.input) throw new Error("入力画像がありません。先に prepare してください");
 
   let file;
@@ -126,7 +148,7 @@ export async function generate({ id, guard, provider, newCandidate = false }) {
   if (g.multiview) {
     const est = provider.estimate("generate_multiview_image");
     file ??= await provider.uploadImage(join(ROOT, p.input));
-    const mv = await runPaidTask({ P, p, guard, provider, slot: "multiview", estimate: est,
+    const mv = await runPaidTask({ P, p, guard, provider, allowRecreate, slot: "multiview", estimate: est,
       plan: { title: `${cfg.name}: 正面1枚 → 4視点画像（確認用に保存）`, items: [{ label: "generate_multiview_image", credits: est }] },
       start: () => provider.startGenerateMultiview({ file }) });
     if (!mv) return;
@@ -135,7 +157,7 @@ export async function generate({ id, guard, provider, newCandidate = false }) {
   }
   const op = g.multiview ? "multiview_to_model" : "image_to_model";
   const est = provider.estimate(op, opts);
-  const rec = await runPaidTask({ P, p, guard, provider, slot: "model", estimate: est,
+  const rec = await runPaidTask({ P, p, guard, provider, allowRecreate, slot: "model", estimate: est,
     plan: { title: `${cfg.name}: ${g.multiview ? "4視点" : "正面画像"} → 3Dモデル候補 1体`, items: [{ label: `${op} ${g.modelVersion} テクスチャ=${g.textureQuality} 面数上限=${g.faceLimit}`, credits: est }] },
     start: async () => {
       if (g.multiview) return provider.startMultiviewToModel({ originalTaskId: p.tasks.multiview.taskId, ...opts, faceLimit: g.faceLimit });
@@ -160,8 +182,11 @@ export async function decide({ id, taskId, decision, note = "", reviewer = proce
   if (!c) throw new Error("確認する候補がありません");
   if (!["approved", "rejected"].includes(decision)) throw new Error("decision は approved / rejected");
   c.decision = decision; c.note = note; c.reviewer = reviewer; c.decidedAt = now();
-  if (decision === "approved") { p.review = { taskId: c.taskId, decision, note, reviewer, at: c.decidedAt }; p.stage = "approved"; }
-  else if (p.review?.taskId === c.taskId) { p.review = null; p.stage = "rejected"; }
+  if (decision === "approved") {
+    if (p.review && p.review.taskId !== c.taskId) resetDownstream(p);
+    p.review = { taskId: c.taskId, decision, note, reviewer, at: c.decidedAt }; p.stage = "approved";
+  }
+  else if (p.review?.taskId === c.taskId) { resetDownstream(p); p.review = null; p.stage = "rejected"; }
   else p.stage = p.review ? p.stage : "rejected";
   await savePipeline(P, p);
   console.log(`${c.taskId} を ${decision === "approved" ? "採用（Approve）" : "不採用（Reject）"} にしました${note ? `: ${note}` : ""}`);
@@ -174,20 +199,20 @@ function requireApproved(p, id) {
   if (p.tasks.model?.taskId !== p.review.taskId) throw new Error(`採用したモデル ${p.review.taskId} と最新の生成タスクが違います。status で確認してください`);
 }
 
-export async function rig({ id, guard, provider, force = false }) {
+export async function rig({ id, guard, provider, force = false, allowRecreate = false }) {
   const P = charPaths(id), cfg = await loadCfg(P), g = cfg.generation, p = await loadPipeline(P);
   requireApproved(p, id);
   if (p.tasks.rig?.status === "success") { console.log("リグ済みです"); return; }
   const modelTaskId = p.review.taskId;
   // 事前チェックは無料（公式）。false でも「できない」とは限らない（公式）ので、止めて人に判断を返す
-  const chk = await runPaidTask({ P, p, guard, provider, slot: "prerigcheck", estimate: 0,
+  const chk = await runPaidTask({ P, p, guard, provider, allowRecreate, slot: "prerigcheck", estimate: 0,
     plan: { title: `${cfg.name}: 骨を入れられるかの事前チェック`, items: [{ label: "animate_prerigcheck", credits: provider.estimate("animate_prerigcheck") }] },
     start: () => provider.startPrerigCheck({ modelTaskId }) });
   if (!chk) return;
   console.log(`事前チェック: riggable=${chk.output.riggable} rig_type=${chk.output.rig_type}`);
   if (!chk.output.riggable && !force) { console.log("骨を入れられない判定です。モデルを見直すか、--force で試してください（有料）"); return; }
   const est = provider.estimate("animate_rig");
-  const rec = await runPaidTask({ P, p, guard, provider, slot: "rig", estimate: est,
+  const rec = await runPaidTask({ P, p, guard, provider, allowRecreate, slot: "rig", estimate: est,
     plan: { title: `${cfg.name}: 骨（リグ）を入れる`, items: [{ label: `animate_rig ${g.rigType} ${g.rigVersion} spec=tripo`, credits: est }] },
     start: () => provider.startRig({ modelTaskId, rigType: chk.output.rig_type || g.rigType, modelVersion: g.rigVersion }) });
   if (!rec) return;
@@ -196,19 +221,20 @@ export async function rig({ id, guard, provider, force = false }) {
   console.log(`リグ済みモデル: ${rel(join(P.animations, `${rec.taskId}_rigged.glb`))}`);
 }
 
-export async function animate({ id, guard, provider }) {
+export async function animate({ id, guard, provider, allowRecreate = false }) {
   const P = charPaths(id), cfg = await loadCfg(P), g = cfg.generation, p = await loadPipeline(P);
   requireApproved(p, id);
   if (p.tasks.rig?.status !== "success") throw new Error("先に rig してください");
   const animations = Object.values(g.animations);
   const est = provider.estimate("animate_retarget", { animations });
-  const rec = await runPaidTask({ P, p, guard, provider, slot: "retarget", estimate: est,
+  const rec = await runPaidTask({ P, p, guard, provider, allowRecreate, slot: "retarget", estimate: est,
     plan: { title: `${cfg.name}: アニメーションを当てる（1タスクにまとめる）`, items: [{ label: `animate_retarget ${animations.join(", ")}`, credits: est }] },
     start: () => provider.startRetarget({ rigTaskId: p.tasks.rig.taskId, animations }) });
   if (!rec) return;
   const dest = join(P.animations, `${rec.taskId}_animated.glb`);
   if (!(await exists(dest))) await provider.downloadOutput(rec.taskId, "model", dest);
   p.animatedFile = rel(dest); p.requestedAnimations = g.animations; p.stage = "animated";
+  p.animatedFrom = { model: p.review.taskId, rig: p.tasks.rig.taskId, retarget: rec.taskId };
   await savePipeline(P, p);
   console.log(`アニメ付きモデル: ${rel(dest)}`);
 }
@@ -216,11 +242,12 @@ export async function animate({ id, guard, provider }) {
 export async function optimize({ id }) {
   const P = charPaths(id), cfg = await loadCfg(P), p = await loadPipeline(P);
   if (!p.animatedFile) throw new Error("先に animate してください");
+  if (p.animatedFrom?.model !== p.review?.taskId) throw new Error(`アニメ付きモデルは採用中のモデル（${p.review?.taskId}）から作られたものではありません。rig / animate からやり直してください`);
   const out = join(P.optimized, `${id}.glb`);
   await mkdir(P.optimized, { recursive: true });
   const r = await optimizeGlb({ input: join(ROOT, p.animatedFile), output: out, wanted: p.requestedAnimations, ...cfg.optimize });
   const { size } = await import("node:fs/promises").then((m) => m.stat(out));
-  p.optimized = { file: rel(out), bytes: size, before: r.before, after: r.after, clipMap: r.clipMap, headBone: r.headBone, at: now() };
+  p.optimized = { from: p.animatedFrom, file: rel(out), bytes: size, before: r.before, after: r.after, clipMap: r.clipMap, headBone: r.headBone, at: now() };
   p.stage = "optimized"; await savePipeline(P, p);
   console.log(`最適化: ${rel(out)} ${(size / 1024).toFixed(0)}KB  三角形 ${r.before.triangles}→${r.after.triangles}  テクスチャ ${JSON.stringify(r.after.textures.map((t) => t.size))}  クリップ ${JSON.stringify(r.clipMap)}  頭の骨 ${r.headBone}`);
 }
@@ -228,6 +255,7 @@ export async function optimize({ id }) {
 export async function register({ id }) {
   const P = charPaths(id), cfg = await loadCfg(P), p = await loadPipeline(P);
   if (!p.optimized) throw new Error("先に optimize してください");
+  if (p.optimized.from?.model !== p.review?.taskId) throw new Error("最適化済みモデルが採用中のモデルと合いません。optimize からやり直してください");
   cfg.model = p.optimized.file;
   cfg.animations = p.optimized.clipMap;
   if (p.optimized.headBone) cfg.sockets.head = { ...(cfg.sockets.head || {}), bone: p.optimized.headBone };
@@ -243,6 +271,16 @@ export async function register({ id }) {
   await writeJson(idxPath, idx);
   p.stage = "registered"; await savePipeline(P, p);
   console.log(`ゲームに登録しました: ${rel(idxPath)} ← ${id} v${cfg.version}（${entry.provider}）`);
+}
+
+/** 作成の返事を受け取れなかったタスクを、Tripo 側で見つけたIDで引き取る（作り直さない） */
+export async function adopt({ id, slot, taskId }) {
+  if (!["multiview", "model", "prerigcheck", "rig", "retarget"].includes(slot)) throw new Error("--slot は multiview / model / prerigcheck / rig / retarget");
+  if (!taskId) throw new Error("--task <taskId> が必要です");
+  const P = charPaths(id), p = await loadPipeline(P);
+  p.tasks[slot] = { taskId, status: "queued", adoptedAt: now() };
+  await savePipeline(P, p);
+  console.log(`${slot} に ${taskId} を引き取りました。同じコマンド（build など）を流すと結果を取りに行きます`);
 }
 
 export async function status({ id }) {

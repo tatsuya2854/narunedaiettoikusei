@@ -1393,6 +1393,10 @@ function fitFallback(){
                                (-c.ay*s + (H-c.h*s)).toFixed(1)+"px";
 }
 function buildRig(){
+  if(renderMode() === "3d"){ mount3D(); return; }
+  build2D();
+}
+function build2D(){
   if(!initGL()){
     // WebGLが使えない端末：全身1枚を出すだけにする（ふわふわはCSSが持っている）
     glFail = true;
@@ -1406,7 +1410,6 @@ function buildRig(){
   }
   fitRig();
   applyOutfit();
-  mount3D();
 }
 
 /* 骨のワールド行列 → 頂点をスキニング → 描く */
@@ -1686,22 +1689,25 @@ function kickRig(power){
 var R3 = null, actHint = null;
 function r3(fn, a, b){ if(R3 && R3.active){ try{ R3[fn](a, b); }catch(e){} } }
 function toIdle(){ var p = idlePose(); setPose(p); r3("onIdlePose", p); }
+// 3Dはためしなので覚えない（一度 ?r=3d を開いた人が、ずっと重い描画に入り続けないように）
 function renderMode(){
   var m = null;
   try{ m = new URLSearchParams(location.search).get("r"); }catch(e){}
-  try{ if(m === "3d" || m === "2d") localStorage.setItem("naru_render", m); else m = localStorage.getItem("naru_render"); }catch(e){}
-  return m === "3d" ? "3d" : "2d";
+  return m === "3d" && window.fetch ? "3d" : "2d";
 }
 function back2D(e){
   R3 = null; document.documentElement.classList.remove("r3d");
   if(e) console.warn("3Dをやめて2Dで描きます:", e && e.message || e);
+  if(!G && !glFail) build2D();                       // 2D はここで初めて作る（3D中は GPU を2つ持たない）
+  if(!rigRaf) rigRaf = requestAnimationFrame(rigLoop);
 }
 function mount3D(){
-  if(renderMode() !== "3d" || !window.fetch) return;
+  document.documentElement.classList.add("r3d");     // 読み込み中に2Dの静止画がチラつかないように
   import("./3d/char3d.js").then(function(m){
     return m.mount({ host: $("body"), reduced: REDUCED, onFail: back2D });
   }).then(function(api){
-    R3 = api; document.documentElement.classList.add("r3d");
+    R3 = api;
+    if(rigRaf){ cancelAnimationFrame(rigRaf); rigRaf = 0; }   // 3D中は2Dのループを止める
     r3("onIdlePose", idlePose());
   }).catch(back2D);
 }
@@ -1726,7 +1732,7 @@ function rigLoop(ts){
   var dt = rigLast ? Math.min(0.045, (ts - rigLast)/1000) : 0.016;
   rigLast = ts;
   if(document.hidden) return;
-  if(R3 && R3.active) return;                       // 3Dが描いている間は2Dの計算をしない
+  if(R3 && R3.active){ cancelAnimationFrame(rigRaf); rigRaf = 0; return; }   // 3Dが描いている間は2Dを回さない
   if(REDUCED){ if(ts - rigStill < 200) return; rigStill = ts; }   // 動きを減らす設定：静止画として時々描き直すだけ
   rigT += dt;
   rigKick *= Math.pow(0.28, dt);
@@ -1793,7 +1799,11 @@ function playAct(name){
   if(seqTimer){ clearInterval(seqTimer); seqTimer=null; }
   if(actTimer){ clearTimeout(actTimer); actTimer=null; }
   for(var k in ACT){ if(ACT[k].css) floatEl.classList.remove(ACT[k].css); }
-  if(REDUCED){ setPose(a.f[0]); return; }   // 動きを減らす設定なら1枚出すだけ
+  if(REDUCED){                              // 動きを減らす設定なら1枚出すだけ。長さが過ぎたら待機に戻す
+    setPose(a.f[0]);
+    actTimer = setTimeout(function(){ actTimer = null; toIdle(); }, a.f.length * a.n * a.ms);
+    return;
+  }
   void floatEl.offsetWidth;                 // 体の動きを頭から再生させる
   if(a.css) floatEl.classList.add(a.css);
   var step = 0, total = a.f.length * a.n;
@@ -2740,7 +2750,7 @@ window.__naru={ get:function(){ return S; }, set:function(o){ Object.assign(S,o)
   charts:function(){ var o={}; SONGS.forEach(function(g){ var k=SONG; useSong(g); o[g.id]=makeChart().length; useSong(k); }); return o; }, danceState:function(){ return D; }, closet:sheetCloset, wear:function(o,a){ if(o) S.outfit=o; if(a) S.acc=a; applyOutfit(); render(); save(); },
   arm:function(l,r){ POSE.__t={al:l,ar:r}; setPose("__t"); },
   joint:function(o){ POSE.__t=o; setPose("__t"); }, gl:function(){ return G; }, fit:function(v){ FIT=v; },
-  renderer:function(m){ try{ localStorage.setItem("naru_render", m === "3d" ? "3d" : "2d"); }catch(e){} location.reload(); }, r3:function(){ return R3; },
+  renderer:function(m){ var u = new URL(location.href); u.searchParams.set("r", m === "3d" ? "3d" : "2d"); location.href = u.href; }, r3:function(){ return R3; },
   dayEvent:todayEvent, season:thisSeason, renderDay:renderDay,
   evFor:eventFor,
   unlockAll:function(){ OUTFITS.concat(ACCS).forEach(function(i){ S.unlocked[i.id]=1; }); save(); }, unlocks:checkUnlocks, outfits:OUTFITS, accs:ACCS, stages:STAGES, cache:spriteCache };

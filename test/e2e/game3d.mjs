@@ -100,9 +100,36 @@ await check("3D: モデルが読めないときは2Dに戻る", async () => {
   await ctx.route("**/*.glb", (r) => r.abort());
   const page = await ctx.newPage();
   await page.goto(base + "?r=3d");
+  await page.waitForFunction(() => window.__naru);
+  await page.evaluate(() => window.__naru.set({ stage: 2, hatched: true, careDays: 5 }));
   await page.waitForTimeout(2500);
   assert.equal(await page.evaluate(() => document.documentElement.classList.contains("r3d")), false);
   assert.equal(await page.evaluate(() => window.__naru.r3()), null);
+  assert.ok((await inkRatio(page, "#body")) > 0.08, "2Dに戻った後にキャラが描かれていない");
+  await ctx.close();
+});
+
+await check("3Dは覚えない: ?r=3d の後、パラメータ無しで開くと2D", async () => {
+  const ctx = await browser.newContext({ ...iphone });
+  const page = await ctx.newPage();
+  await page.goto(base + "?r=3d");
+  await page.waitForFunction(() => window.__naru && window.__naru.r3() && window.__naru.r3().active, null, { timeout: 15000 });
+  await page.goto(base);
+  await page.waitForTimeout(1500);
+  assert.equal(await page.evaluate(() => document.documentElement.classList.contains("r3d")), false);
+  assert.equal(await page.$$eval("canvas.rig3d", (c) => c.length), 0);
+  await ctx.close();
+});
+
+await check("3D + 動きを減らす設定: ワンショットの後に待機へ戻る", async () => {
+  const { ctx, page, errors } = await open(base + "?r=3d", { reducedMotion: "reduce" });
+  await page.waitForFunction(() => window.__naru.r3() && window.__naru.r3().active, null, { timeout: 15000 });
+  await page.evaluate(() => window.__naru.act("cheer"));
+  await page.waitForTimeout(200);
+  assert.equal((await page.evaluate(() => window.__naru.r3().state())).current, "HAPPY");
+  await page.waitForTimeout(4500);
+  assert.equal((await page.evaluate(() => window.__naru.r3().state())).current, "IDLE");
+  assert.deepEqual(errors, []);
   await ctx.close();
 });
 

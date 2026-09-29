@@ -74,7 +74,11 @@ import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
 const ITEMS = ["顔", "目", "口", "髪型（ポニーテール）", "体型", "頭身", "服（黄シャツ・グレー短パン）", "色", "アクセ（耳付き帽子）", "雰囲気"];
 const checks = document.getElementById("checks");
 ITEMS.forEach((t) => { const l = document.createElement("label"); l.innerHTML = `<input type="checkbox"> ${t}`; checks.append(l); });
-checks.addEventListener("change", () => { document.getElementById("approve").disabled = [...checks.querySelectorAll("input")].some((i) => !i.checked); });
+// Approve できるのは「いま画面に出し終えた候補」を10項目ぜんぶ見たときだけ
+let shown = null;   // 表示し終えた候補の taskId
+const approveBtn = document.getElementById("approve");
+const refresh = () => { approveBtn.disabled = !shown || [...checks.querySelectorAll("input")].some((i) => !i.checked); };
+checks.addEventListener("change", refresh);
 
 const st = await (await fetch("/api/state")).json();
 document.getElementById("title").textContent = `3Dモデル確認：${st.name}（${st.id}）`;
@@ -99,7 +103,7 @@ const sun = new THREE.DirectionalLight(0xffffff, 1.4); sun.position.set(1, 2, 3)
 const cam = new THREE.PerspectiveCamera(30, 1, 0.01, 100);
 const ctl = new OrbitControls(cam, renderer.domElement);
 const clock = new THREE.Clock();
-let root = null, mixer = null, radius = 1, center = new THREE.Vector3();
+let root = null, mixer = null, radius = 1, center = new THREE.Vector3(), gen = 0;
 
 function resize() { const r = host.getBoundingClientRect(); renderer.setSize(r.width, r.height, false); cam.aspect = r.width / r.height; cam.updateProjectionMatrix(); }
 new ResizeObserver(resize).observe(host);
@@ -107,8 +111,11 @@ new ResizeObserver(resize).observe(host);
 const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
 async function load(i) {
   const o = opts[i]; if (!o) return;
-  document.getElementById("cand").textContent = o.taskId ? o.taskId : o.label;
+  const my = ++gen;
+  shown = null; checks.querySelectorAll("input").forEach((c) => (c.checked = false)); refresh();   // 読み込み中は判断させない
+  document.getElementById("cand").textContent = "読み込み中…";
   const g = await loader.loadAsync("/" + o.file);
+  if (my !== gen) return;   // 後から選んだ候補が先に来ていたら、古い方は捨てる
   if (root) scene.remove(root);
   root = g.scene; scene.add(root);
   const box = new THREE.Box3().setFromObject(root); box.getCenter(center); radius = box.getSize(new THREE.Vector3()).length() / 2;
@@ -116,6 +123,9 @@ async function load(i) {
   setView("front");
   mixer = g.animations.length ? new THREE.AnimationMixer(root) : null;
   const clips = document.getElementById("clips"); clips.innerHTML = "";
+  shown = o.taskId || null;
+  document.getElementById("cand").textContent = o.taskId ? o.taskId : o.label;
+  refresh();
   g.animations.forEach((c) => {
     const b = document.createElement("button"); b.textContent = `▶ ${c.name}`;
     b.onclick = () => { mixer.stopAllAction(); mixer.clipAction(c).reset().play(); };
@@ -140,7 +150,7 @@ resize();
 await load(0);
 
 async function send(decision) {
-  const o = opts[Number(which.value)];
+  const o = { taskId: shown };   // 送るのは「表示し終えた」候補だけ（選択欄の値ではない）
   if (!o.taskId) { document.getElementById("msg").textContent = "判断するのは生成された候補です（上のリストで候補を選んでください）"; return; }
   const r = await fetch("/api/decide", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ taskId: o.taskId, decision, note: document.getElementById("note").value }) });
   const j = await r.json();

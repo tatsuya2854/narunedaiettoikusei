@@ -30,7 +30,9 @@ export async function mount({ host, base = "./", characterId, reduced = false, o
 
   const loader = new T.GLTFLoader().setMeshoptDecoder(T.MeshoptDecoder);
   const t0 = performance.now();
-  const gltf = await loader.loadAsync(base + cfg.model);
+  let gltf;
+  try { gltf = await loader.loadAsync(base + cfg.model); }
+  catch (e) { renderer.dispose(); renderer.forceContextLoss(); throw e; }   // 2Dに戻る前に GPU を返す
   const loadMs = Math.round(performance.now() - t0);
   const model = gltf.scene;
   model.scale.setScalar(cfg.scale || 1);
@@ -73,7 +75,8 @@ export async function mount({ host, base = "./", characterId, reduced = false, o
     },
   };
   // character.json の animations は「状態 → クリップ名」
-  const sm = new AnimationStateMachine({ clips: cfg.animations || {}, driver, fade: 0.25 });
+  // 動きを減らす設定ではフェードせず、各クリップの最初の姿勢で止めて見せる
+  const sm = new AnimationStateMachine({ clips: cfg.animations || {}, driver, fade: reduced ? 0 : 0.25 });
 
   // --- 大きさ ---
   let W = 0, Hh = 0;
@@ -99,6 +102,7 @@ export async function mount({ host, base = "./", characterId, reduced = false, o
   // --- 描画ループ ---
   const clock = new T.Clock();
   let api = null;
+  let still = 0;
   let raf = 0, active = true, slow = 0, frames = 0, sum = 0;
   const hips = model.getObjectByName("Hips") || model.getObjectByName(Object.values(cfg.sockets || {})[0]?.bone || "") || null;
   const hipsY0 = hips ? hips.getWorldPosition(new T.Vector3()).y : 0;
@@ -135,10 +139,17 @@ export async function mount({ host, base = "./", characterId, reduced = false, o
   canvas.addEventListener("webglcontextlost", (e) => { e.preventDefault(); fail(new Error("WebGL context lost")); });
 
   function dispose() {
-    active = false; api.active = false;
-    cancelAnimationFrame(raf); ro?.disconnect();
-    mixer.stopAllAction();
-    renderer.dispose();
+    active = false; if (api) api.active = false;
+    cancelAnimationFrame(raf); clearInterval(still); ro?.disconnect();
+    mixer.stopAllAction(); mixer.uncacheRoot(model);
+    scene.traverse((o) => {
+      o.geometry?.dispose();
+      for (const m of [].concat(o.material || [])) {
+        for (const v of Object.values(m)) if (v && v.isTexture) v.dispose();
+        m.dispose();
+      }
+    });
+    renderer.dispose(); renderer.forceContextLoss();
     canvas.remove();
   }
 
@@ -155,7 +166,11 @@ export async function mount({ host, base = "./", characterId, reduced = false, o
   host.appendChild(canvas);
   ro?.observe(canvas);
   fit();
-  if (reduced) draw(0); else loop();
+  if (reduced) {
+    // 時間は進める（ワンショットの終わりで待機に戻るため）が、アニメは動かさない
+    draw(0);
+    still = setInterval(() => { const before = sm.currentClip; sm.tick(0.25); if (sm.currentClip !== before) draw(0); }, 250);
+  } else loop();
   return api;
 }
 

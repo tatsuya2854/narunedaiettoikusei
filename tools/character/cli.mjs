@@ -20,7 +20,7 @@ const { values: o, positionals } = parseArgs({
   options: {
     provider: { type: "string" }, "max-credits": { type: "string" }, yes: { type: "boolean" }, "dry-run": { type: "boolean" },
     new: { type: "boolean" }, force: { type: "boolean" }, note: { type: "string" }, name: { type: "string" }, source: { type: "string" },
-    task: { type: "string" }, port: { type: "string" },
+    task: { type: "string" }, port: { type: "string" }, slot: { type: "string" }, "allow-recreate": { type: "boolean" },
   },
 });
 const [cmd, id, ...rest] = positionals;
@@ -32,7 +32,7 @@ const maxCredits = Number(o["max-credits"] ?? process.env.CHARACTER_MAX_CREDITS 
 const ctx = () => {
   const provider = createProvider(o.provider);
   const guard = new CreditGuard({ provider, maxCredits, assumeYes: !!o.yes, dryRun: !!o["dry-run"] });
-  return { id, provider, guard };
+  return { id, provider, guard, allowRecreate: !!o["allow-recreate"] };
 };
 
 try {
@@ -48,6 +48,7 @@ try {
     case "optimize": await pl.optimize({ id }); break;
     case "register": await pl.register({ id }); break;
     case "status": await pl.status({ id }); break;
+    case "adopt": await pl.adopt({ id, slot: o.slot, taskId: o.task }); break;
     case "build": await build(); break;
     default: usage();
   }
@@ -80,6 +81,7 @@ function usage() {
   npm run character:build  -- <id> [--provider mock|tripo] [--max-credits N] [--yes] [--dry-run]
   npm run character:review -- <id>
   npm run character -- init <id> --source <画像> [--name 表示名]
-  npm run character -- <prepare|generate|approve|reject|rig|animate|optimize|register|status> <id> [--note ...] [--task <taskId>] [--new]`);
+  npm run character -- <prepare|generate|approve|reject|rig|animate|optimize|register|status> <id> [--note ...] [--task <taskId>] [--new]
+  npm run character -- adopt <id> --slot <model|rig|retarget|...> --task <taskId>   返事を受け取れなかったタスクを引き取る`);
   process.exit(2);
 }

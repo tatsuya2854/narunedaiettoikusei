@@ -61,9 +61,13 @@ npm run test:e2e
 
 - Reject したら：`npm run character -- generate naru --provider tripo --new`（また30）
 - 途中で落ちたら：同じコマンドをもう一度。**作ったタスクIDは保存してあるので、作り直さずに結果を取りに行く**
+- 作成の返事を受け取る前に通信が切れたら：Tripo 側にタスクができているかもしれないので**自動では作り直さない**。
+  https://platform.tripo3d.ai で確かめて、あれば `npm run character -- adopt naru --slot model --task <taskId>`、無ければ `--allow-recreate` を付けて再実行
 - 新しいキャラ：`npm run character -- init <id> --source <正面画像> --name 表示名` → 上と同じ。ゲーム側は `index.json` と `character.json` を読むだけなのでコード変更は不要
 
 ## ゲーム側のしくみ
+
+- `?r=3d` を付けて開いたときだけ3D。**覚えない**（次にふつうに開けば2D）。3Dのときは2DのWebGLを作らない（GPUを2つ持たない）
 
 - `index.html` のゲームロジック（いつ何をするか）はそのまま。出来事が起きたら `3d/state-machine.js` に名前を渡すだけ
 - 状態：ベース（ループ）= IDLE / WALK / RUN / SLEEP / SAD / DANCE、ワンショット = JUMP / HAPPY / EAT / LEVEL_UP / WAVE / PET / ANGRY
