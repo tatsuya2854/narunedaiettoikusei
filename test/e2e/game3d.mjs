@@ -147,7 +147,10 @@ await check("3D: モデルが読めないときは2Dに戻る", async () => {
   await page.waitForFunction(() => !document.documentElement.classList.contains("r3d"), null, { timeout: 15000 });
   await page.waitForTimeout(1000);
   assert.equal(await page.evaluate(() => window.__naru.r3()), null);
-  assert.ok((await inkRatio(page, "#body")) > 0.08, "2Dに戻った後にキャラが描かれていない");
+  // 2Dの絵はこの時点で初めて読み込むので、描かれるまで少し待つ（最大10秒）
+  let ink = 0;
+  for (let t = 0; t < 20 && ink <= 0.08; t++) { ink = await inkRatio(page, "#body"); if (ink <= 0.08) await page.waitForTimeout(500); }
+  assert.ok(ink > 0.08, `2Dに戻った後にキャラが描かれていない（${ink.toFixed(3)}）`);
   await ctx.close();
 });
 
