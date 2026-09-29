@@ -15,7 +15,8 @@ const server = createServer(async (q, r) => {
   try { const p = join(root, decodeURIComponent(new URL(q.url, "http://x").pathname).replace(/\/$/, "/index.html")); if (!p.startsWith(root)) throw 0;
     r.writeHead(200, { "content-type": T[extname(p)] || "application/octet-stream" }); r.end(await readFile(p)); } catch { r.writeHead(404); r.end(); }
 }).listen(0);
-const base = `http://localhost:${server.address().port}/index.html`;
+// BASE_URL を渡すと本番（GitHub Pages）を確かめる
+const base = process.env.BASE_URL || `http://localhost:${server.address().port}/index.html`;
 const browser = await chromium.launch({ args: ["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader"] });
 const iphone = devices["iPhone 13"];
 let failed = 0;
