@@ -91,8 +91,27 @@ await check("3D: 読み込み・状態の切り替え・2Dを隠す", async () =
   await page.evaluate(() => window.__naru.meal("normal"));
   await page.waitForTimeout(250);
   const eat = await page.evaluate(() => window.__naru.r3().state());
-  assert.equal(eat.current, "EAT"); assert.equal(eat.clip, "happy");
-  if (out) await page.screenshot({ path: `${out}/3d-happy.png` });
+  const clips = (await page.evaluate(() => window.__naru.r3().info.clips));
+  assert.equal(eat.current, "EAT"); assert.equal(eat.clip, clips.includes("eat") ? "eat" : "happy");
+  if (out) await page.screenshot({ path: `${out}/3d-eat.png` });
+  await page.waitForTimeout(3500);
+  // 寝る（たいりょくが少ないとき）・ダンス
+  if (clips.includes("sleep")) {
+    await page.evaluate(() => { window.__naru.set({ energy: 10 }); window.__naru.act("nap"); });
+    await page.waitForTimeout(400);
+    // 直前の食事で進化の演出（喜ぶ）が遅れて重なることがあるので、ベースが「寝る」になったかを見る
+    assert.equal((await page.evaluate(() => window.__naru.r3().state())).base, "SLEEP");
+    await page.waitForFunction(() => window.__naru.r3().state().clip === "sleep", null, { timeout: 8000 });
+    if (out) await page.screenshot({ path: `${out}/3d-sleep.png` });
+    await page.evaluate(() => window.__naru.set({ energy: 80 }));
+  }
+  if (clips.includes("dance")) {
+    await page.evaluate(() => window.__naru.dance());
+    await page.waitForTimeout(800);
+    assert.equal((await page.evaluate(() => window.__naru.r3().state())).clip, "dance");
+    if (out) await page.screenshot({ path: `${out}/3d-dance.png` });
+    await page.evaluate(() => window.__naru.endDance(true));
+  }
   assert.deepEqual(errors, []);
   await ctx.close();
 });

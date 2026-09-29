@@ -1,6 +1,6 @@
 {
   "characterId": "naru",
-  "stage": "optimized",
+  "stage": "registered",
   "tasks": {
     "model": {
       "taskId": "013cc118-9adf-4f58-99bc-e02a54ae2e1c",
@@ -96,6 +96,19 @@
         "model": "(url)",
         "pbr_model": "(url)"
       }
+    },
+    "retarget:DANCE": {
+      "taskId": "da6dc802-cbe4-47a1-8374-c276d2b4c512",
+      "status": "success",
+      "createdAt": "2026-09-29T07:18:38.981Z",
+      "estimate": 10,
+      "finishedAt": "2026-09-29T07:18:45.374Z",
+      "consumedCredits": 10,
+      "output": {
+        "model_url": "(url)",
+        "model": "(url)",
+        "pbr_model": "(url)"
+      }
     }
   },
   "candidates": [
@@ -137,7 +150,7 @@
     "at": "2026-09-29T06:57:30.161Z"
   },
   "credits": {
-    "spent": 155,
+    "spent": 165,
     "log": [
       {
         "slot": "model",
@@ -180,17 +193,26 @@
         "taskId": "5744b488-3257-4115-8d3d-4b92883a246c",
         "credits": 10,
         "at": "2026-09-29T07:00:56.153Z"
+      },
+      {
+        "slot": "retarget:DANCE",
+        "taskId": "da6dc802-cbe4-47a1-8374-c276d2b4c512",
+        "credits": 10,
+        "at": "2026-09-29T07:18:45.374Z"
       }
     ]
   },
-  "updatedAt": "2026-09-29T07:08:44.539Z",
+  "updatedAt": "2026-09-29T07:19:15.890Z",
   "input": "assets/characters/source/naru/input.png",
   "animatedFile": "assets/characters/animations/naru/5617d936-e18d-4932-bb34-10190d371ee8_merged.glb",
   "requestedAnimations": {
     "IDLE": "preset:biped:idle",
     "WALK": "preset:biped:walk",
     "JUMP": "preset:biped:jump",
-    "HAPPY": "preset:biped:cheer"
+    "HAPPY": "preset:biped:cheer",
+    "DANCE": "preset:biped:dance_01",
+    "SLEEP": "local:sleep",
+    "EAT": "local:eat"
   },
   "animatedFrom": {
     "model": "013cc118-9adf-4f58-99bc-e02a54ae2e1c",
@@ -199,14 +221,16 @@
       "11349cb0-4b9d-4337-a8cb-79152d058efd",
       "acf2b097-7ad3-4aee-9679-6e321338c468",
       "5744b488-3257-4115-8d3d-4b92883a246c",
-      "35932e39-d0e8-497c-bbc8-5d3a995d5ec0"
+      "35932e39-d0e8-497c-bbc8-5d3a995d5ec0",
+      "da6dc802-cbe4-47a1-8374-c276d2b4c512"
     ]
   },
   "retargetFiles": {
     "HAPPY": "assets/characters/animations/naru/35932e39-d0e8-497c-bbc8-5d3a995d5ec0_animated.glb",
     "IDLE": "assets/characters/animations/naru/11349cb0-4b9d-4337-a8cb-79152d058efd_idle.glb",
     "WALK": "assets/characters/animations/naru/acf2b097-7ad3-4aee-9679-6e321338c468_walk.glb",
-    "JUMP": "assets/characters/animations/naru/5744b488-3257-4115-8d3d-4b92883a246c_jump.glb"
+    "JUMP": "assets/characters/animations/naru/5744b488-3257-4115-8d3d-4b92883a246c_jump.glb",
+    "DANCE": "assets/characters/animations/naru/da6dc802-cbe4-47a1-8374-c276d2b4c512_dance.glb"
   },
   "optimized": {
     "from": {
@@ -216,11 +240,12 @@
         "11349cb0-4b9d-4337-a8cb-79152d058efd",
         "acf2b097-7ad3-4aee-9679-6e321338c468",
         "5744b488-3257-4115-8d3d-4b92883a246c",
-        "35932e39-d0e8-497c-bbc8-5d3a995d5ec0"
+        "35932e39-d0e8-497c-bbc8-5d3a995d5ec0",
+        "da6dc802-cbe4-47a1-8374-c276d2b4c512"
       ]
     },
     "file": "assets/characters/optimized/naru/naru.glb",
-    "bytes": 542468,
+    "bytes": 807572,
     "before": {
       "triangles": 18906,
       "vertices": 11112,
@@ -238,7 +263,10 @@
         "idle",
         "walk",
         "jump",
-        "cheer"
+        "cheer",
+        "dance_01",
+        "sleep",
+        "eat"
       ],
       "skins": 1,
       "joints": 41
@@ -260,7 +288,10 @@
         "idle",
         "walk",
         "jump",
-        "happy"
+        "happy",
+        "dance",
+        "sleep",
+        "eat"
       ],
       "skins": 1,
       "joints": 41
@@ -269,9 +300,12 @@
       "IDLE": "idle",
       "WALK": "walk",
       "JUMP": "jump",
-      "HAPPY": "happy"
+      "HAPPY": "happy",
+      "DANCE": "dance",
+      "SLEEP": "sleep",
+      "EAT": "eat"
     },
     "headBone": "Head",
-    "at": "2026-09-29T07:07:24.726Z"
+    "at": "2026-09-29T07:19:15.690Z"
   }
 }
