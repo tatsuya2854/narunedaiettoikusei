@@ -40,7 +40,9 @@
       "WALK": "preset:biped:walk",
       "JUMP": "preset:biped:jump",
       "HAPPY": "preset:biped:cheer"
-    }
+    },
+    "inputImage": "assets/characters/source/naru/front_nolines_v2.png",
+    "inputImageNote": "ChatGPT（Codex の image_gen）で元絵の黒い輪郭線だけを消した版。顔の線・ほっぺ・帽子の点は残す。デザインの正は sourceImage"
   },
   "optimize": {
     "maxTextureSize": 1024,

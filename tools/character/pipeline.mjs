@@ -65,7 +65,8 @@ async function loadCfg(P) {
 
 export async function prepare({ id }) {
   const P = charPaths(id), cfg = await loadCfg(P);
-  const src = join(ROOT, cfg.sourceImage);
+  // 3D化に渡す絵は generation.inputImage で差し替えられる（例: 輪郭線を消した版）。正（Source of Truth）は sourceImage のまま
+  const src = join(ROOT, cfg.generation.inputImage || cfg.sourceImage);
   const out = join(P.source, "input.png");   // 派生物。front.* は触らない
   const t = await sharp(src).ensureAlpha().trim({ threshold: 1 }).toBuffer({ resolveWithObject: true });
   const side = Math.round(Math.max(t.info.width, t.info.height) * 1.15);
