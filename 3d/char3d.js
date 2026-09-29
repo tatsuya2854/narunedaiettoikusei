@@ -4,11 +4,13 @@
 // ・重すぎる端末（平均 22fps 未満が続く）でも2Dに戻す（iPhone の発熱・電池を優先）
 import * as T from "./vendor/three-char.js";
 import { AnimationStateMachine } from "./state-machine.js";
+import { createFace, measureHead, createOutfitter } from "./look.js";
+import { attachAccessory, disposeObject, hasAccessory } from "./accessories.js";
 
 const FIT_H = 0.82;          // キャラの背丈が描画枠の高さに占める割合（2D の FIT に見た目を合わせた値）
 const SLOW_MS = 45;          // これより遅いフレームが続いたら2Dへ
 
-export async function mount({ host, base = "./", characterId, reduced = false, onFail = () => {} }) {
+export async function mount({ host, base = "./", characterId, reduced = false, onFail = () => {}, face: faceInfo = null }) {
   const idx = await getJson(`${base}assets/characters/index.json`);
   const entry = idx.characters.find((c) => c.id === (characterId || idx.default));
   if (!entry) throw new Error("3Dキャラが登録されていません");
@@ -52,12 +54,17 @@ export async function mount({ host, base = "./", characterId, reduced = false, o
   const shadow = makeShadow(Math.max(size.x, size.z) * 0.7);
   scene.add(shadow);
 
-  // アクセの取り付け点（今は「付けられる口」だけ用意。見た目は今後 character.json の sockets で調整）
+  // アクセの取り付け点
   const sockets = {};
   for (const [name, s] of Object.entries(cfg.sockets || {})) {
     const bone = model.getObjectByName(s.bone);
     if (bone) sockets[name] = bone;
   }
+  // 表情（顔シートに2Dの顔パーツを描く）・頭の大きさ・着せ替え。アニメを始める前（基本姿勢）に測る
+  const face = await createFace(model, faceInfo).catch((e) => { console.warn("表情の準備に失敗:", e); return null; });
+  const head = sockets.head ? { ...measureHead(model, sockets.head), eyes: face?.eyes, boneRest: sockets.head.matrixWorld.clone() } : null;
+  const outfitter = createOutfitter(model);
+  let acc = null, accId = null;
 
   const mixer = new T.AnimationMixer(model);
   const clips = Object.fromEntries(gltf.animations.map((c) => [c.name, c]));
@@ -144,6 +151,7 @@ export async function mount({ host, base = "./", characterId, reduced = false, o
     active = false; if (api) api.active = false;
     cancelAnimationFrame(raf); clearInterval(still); ro?.disconnect();
     mixer.stopAllAction(); mixer.uncacheRoot(model);
+    disposeObject(acc); face?.dispose(); outfitter?.dispose();
     scene.traverse((o) => {
       o.geometry?.dispose();
       for (const m of [].concat(o.material || [])) {
@@ -157,12 +165,25 @@ export async function mount({ host, base = "./", characterId, reduced = false, o
 
   api = {
     active: true, loadMs, fps: null,
-    info: { id: cfg.characterId, version: cfg.version, provider: cfg.provenance?.provider, clips: Object.keys(clips) },
+    info: { id: cfg.characterId, version: cfg.version, provider: cfg.provenance?.provider, clips: Object.keys(clips), face: !!face, head: !!head },
     onAct: (name, ms) => { sm.onAct(name, ms); if (reduced) draw(0); },
     onIdlePose: (p) => { sm.onIdlePose(p); if (reduced) draw(0); },
     onDance: (on) => sm.onDance(on),
+    // 表情：2Dの EOUT をそのまま受け取る（目は開かない）
+    setFace: (E) => { if (face?.draw(E) && reduced) draw(0); },
+    // 着せ替え：2Dの OUTFITS の1つ（shirt / shorts の HSL）
+    setOutfit: (o) => { outfitter?.apply(o); if (reduced) draw(0); },
+    // アクセ：2Dの ACCS の id。3Dの形が無いものは付けない
+    setAcc: (id) => {
+      if (id === accId) return;
+      disposeObject(acc); acc = null; accId = id;
+      if (head && hasAccessory(id)) acc = attachAccessory(id, head, sockets.head);
+      if (reduced) draw(0);
+    },
     state: () => ({ base: sm.base, current: sm.current, clip: sm.currentClip }),
-    socket: (name) => sockets[name] || null,       // 今後: アクセ（サングラス等）を骨に付ける
+    socket: (name) => sockets[name] || null,
+    // 確認用：キャラを y 軸まわりに回して見る（度）
+    turn: (deg) => { model.rotation.y = (deg * Math.PI) / 180 + ((cfg.rotation?.[1] || 0) * Math.PI) / 180; if (reduced) draw(0); },       // 今後: アクセ（サングラス等）を骨に付ける
     dispose,
   };
   host.appendChild(canvas);

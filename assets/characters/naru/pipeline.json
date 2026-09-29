@@ -202,7 +202,7 @@
       }
     ]
   },
-  "updatedAt": "2026-09-29T08:09:11.857Z",
+  "updatedAt": "2026-09-29T08:51:57.851Z",
   "input": "assets/characters/source/naru/input.png",
   "animatedFile": "assets/characters/animations/naru/5617d936-e18d-4932-bb34-10190d371ee8_procedural.glb",
   "requestedAnimations": {
@@ -233,10 +233,10 @@
       "retarget": "procedural"
     },
     "file": "assets/characters/optimized/naru/naru.glb",
-    "bytes": 251360,
+    "bytes": 242748,
     "before": {
-      "triangles": 18906,
-      "vertices": 11112,
+      "triangles": 22102,
+      "vertices": 12793,
       "textures": [
         {
           "size": [
@@ -244,7 +244,15 @@
             2048
           ],
           "mime": "image/jpeg",
-          "bytes": 346784
+          "bytes": 325441
+        },
+        {
+          "size": [
+            2,
+            2
+          ],
+          "mime": "image/png",
+          "bytes": 94
         }
       ],
       "animations": [
@@ -260,8 +268,8 @@
       "joints": 41
     },
     "after": {
-      "triangles": 14994,
-      "vertices": 9112,
+      "triangles": 14998,
+      "vertices": 9179,
       "textures": [
         {
           "size": [
@@ -269,7 +277,15 @@
             1024
           ],
           "mime": "image/webp",
-          "bytes": 43252
+          "bytes": 40368
+        },
+        {
+          "size": [
+            2,
+            2
+          ],
+          "mime": "image/webp",
+          "bytes": 112
         }
       ],
       "animations": [
@@ -294,6 +310,6 @@
       "EAT": "eat"
     },
     "headBone": "Head",
-    "at": "2026-09-29T08:09:11.649Z"
+    "at": "2026-09-29T08:51:57.611Z"
   }
 }

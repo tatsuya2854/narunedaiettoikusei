@@ -117,6 +117,25 @@ await check("3D: 読み込み・状態の切り替え・2Dを隠す", async () =
   await ctx.close();
 });
 
+await check("3D: 表情・着せ替え・アクセ", async () => {
+  const { ctx, page, errors } = await open(base + "?r=3d");
+  await page.waitForFunction(() => window.__naru.r3() && window.__naru.r3().active, null, { timeout: 15000 });
+  const info = await page.evaluate(() => window.__naru.r3().info);
+  if (!info.face) { console.log("  （顔シートの無いモデルなので表情はスキップ）"); await ctx.close(); return; }
+  await page.evaluate(() => { window.__naru.unlockAll(); window.__naru.face("wow", 5000); });
+  await page.waitForTimeout(600);
+  // 着せ替え・アクセは全部つけ外しして、エラーが出ないこと・頭に付くこと
+  for (const [o, a] of [["mint", "ribbon"], ["pink", "flower"], ["navy", "band"], ["lavender", "shades"], ["black", "phones"], ["gold", "crown"], ["cheer", "none"]]) {
+    await page.evaluate(([o, a]) => window.__naru.wear(o, a), [o, a]);
+    await page.waitForTimeout(250);
+    const has = await page.evaluate((a) => !!window.__naru.r3().socket("head").children.find((c) => c.name === "acc:" + a), a);
+    assert.equal(has, a !== "none", `アクセ ${a}`);
+  }
+  if (out) await page.screenshot({ path: `${out}/3d-look.png` });
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
 await check("3D: モデルが読めないときは2Dに戻る", async () => {
   const ctx = await browser.newContext({ ...iphone });
   await ctx.route("**/*.glb", (r) => r.abort());

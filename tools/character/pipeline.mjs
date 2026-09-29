@@ -337,10 +337,13 @@ export async function optimize({ id }) {
   const isMock = String(p.animatedFrom?.model || "").startsWith("mock-");
   const rotateYDeg = cfg.optimize.rotateYDeg ?? (isMock ? 0 : -90);
   const sideLines = cfg.optimize.sideLines === false || isMock ? null : { forward: [1, 0, 0], ...(cfg.optimize.sideLines || {}) };
-  const r = await optimizeGlb({ input: join(ROOT, p.animatedFile), output: out, wanted: p.requestedAnimations, ...cfg.optimize, rotateYDeg, sideLines });
+  // 表情（顔シート）は character.json の face があり、Tripo のモデルのときだけ
+  const face = !isMock && cfg.face ? cfg.face : null;
+  const r = await optimizeGlb({ input: join(ROOT, p.animatedFile), output: out, wanted: p.requestedAnimations, ...cfg.optimize, rotateYDeg, sideLines, face });
   const { size } = await import("node:fs/promises").then((m) => m.stat(out));
   p.optimized = { from: p.animatedFrom, file: rel(out), bytes: size, before: r.before, after: r.after, clipMap: r.clipMap, headBone: r.headBone, at: now() };
   p.stage = "optimized"; await savePipeline(P, p);
+  if (r.face) console.log(`表情用の顔シート: ${r.face.triangles}三角形・焼き込みの顔を ${r.face.erased}画素 消去・顔の頂点 ${r.face.smoothed} をならした`);
   console.log(`最適化: ${rel(out)} ${(size / 1024).toFixed(0)}KB  三角形 ${r.before.triangles}→${r.after.triangles}  テクスチャ ${JSON.stringify(r.after.textures.map((t) => t.size))}  クリップ ${JSON.stringify(r.clipMap)}  頭の骨 ${r.headBone}`);
 }
 

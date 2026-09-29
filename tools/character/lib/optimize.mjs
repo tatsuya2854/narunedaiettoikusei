@@ -9,6 +9,7 @@ import { dedup, prune, resample, weld, simplify, textureCompress, quantize, mesh
 import { MeshoptEncoder, MeshoptDecoder, MeshoptSimplifier } from "meshoptimizer";
 import sharp from "sharp";
 import { removeSideLines } from "./line-cleanup.mjs";
+import { buildFacePatch } from "./face-patch.mjs";
 
 export async function makeIO() {
   await Promise.all([MeshoptEncoder.ready, MeshoptDecoder.ready, MeshoptSimplifier.ready]);
@@ -84,11 +85,13 @@ export function rotateY(doc, deg) {
   }
 }
 
-export async function optimizeGlb({ input, output, wanted, maxTextureSize = 1024, maxTriangles = 15000, rotateYDeg = 0, sideLines = null }) {
+export async function optimizeGlb({ input, output, wanted, maxTextureSize = 1024, maxTriangles = 15000, rotateYDeg = 0, sideLines = null, face = null }) {
   const io = await makeIO();
   const doc = await io.read(input);
   // 横に回り込んだ輪郭線を消す（回転を焼き込む前＝生出力の向きで判定する）
   const lines = sideLines ? await removeSideLines(doc, sideLines) : null;
+  // 表情用：焼き込みの顔を消して、顔シートを付ける（輪郭線を消した後に）
+  const faceInfo = face ? await buildFacePatch(doc, face) : null;
   rotateY(doc, rotateYDeg);
   const before = stats(doc);
   const clipMap = mapClips(doc, wanted);
@@ -109,7 +112,7 @@ export async function optimizeGlb({ input, output, wanted, maxTextureSize = 1024
   );
   const after = stats(doc);
   await io.write(output, doc);
-  return { before, after, clipMap, headBone, lines };
+  return { before, after, clipMap, headBone, lines, face: faceInfo };
 }
 
 /**

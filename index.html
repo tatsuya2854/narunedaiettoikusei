@@ -1697,6 +1697,7 @@ function renderMode(){
 }
 function back2D(e){
   R3 = null; document.documentElement.classList.remove("r3d");
+  rigKick = 0;   // 3Dの間に溜まった勢いで、2Dが大きく動きすぎないように
   if(e) console.warn("3Dをやめて2Dで描きます:", e && e.message || e);
   if(!G && !glFail) build2D();                       // 2D はここで初めて作る（3D中は GPU を2つ持たない）
   if(!rigRaf) rigRaf = requestAnimationFrame(rigLoop);
@@ -1704,11 +1705,14 @@ function back2D(e){
 function mount3D(){
   document.documentElement.classList.add("r3d");     // 読み込み中に2Dの静止画がチラつかないように
   import("./3d/char3d.js").then(function(m){
-    return m.mount({ host: $("body"), reduced: REDUCED, onFail: back2D });
+    // 顔は2Dと同じパーツ・同じ表情の数値で描く（目は開けない）
+    var face = { src: SPRITE_SRC, cells: MESH.cells, scale: MESH.scale, feat: FEAT, ex: EX };
+    return m.mount({ host: $("body"), reduced: REDUCED, onFail: back2D, face: face });
   }).then(function(api){
     R3 = api;
-    if(rigRaf){ cancelAnimationFrame(rigRaf); rigRaf = 0; }   // 3D中は2Dのループを止める
     r3("onIdlePose", idlePose());
+    r3("setOutfit", outfitById(S.outfit));
+    r3("setAcc", S.acc);
   }).catch(back2D);
 }
 function setPose(name, quiet){
@@ -1727,17 +1731,34 @@ function idlePose(){
 }
 
 var rigStill = 0;
+// 表情をなめらかに寄せる（2Dでも3Dでも使う。結果は EOUT）
+function faceStep(dt){
+  var ez = 1 - Math.exp(-24*dt);
+  flapV += (flap - flapV) * (1 - Math.exp(-14*dt));   // 口パクの出入りも滑らかに
+  var mf = 0.5 - 0.5*Math.cos((rigT-flapT)*TAU*4.6);
+  for(var j=0;j<EK.length;j++){
+    var kk = EK[j], cv = eCur[kk], tv = eTgt[kk];
+    for(var q=0;q<5;q++) cv[q] += (tv[q]-cv[q])*ez;
+    var out = EOUT[EMAP[kk]];
+    out[0]=cv[0]; out[1]=cv[1]; out[2]=cv[2]; out[3]=cv[3]; out[4]=cv[4];
+    if(kk === "mo" && flapV > 0.002) out[4] = cv[4] * (1 - flapV*(0.72 - 0.72*mf));
+  }
+  eCur.bs += (eTgt.bs-eCur.bs)*ez;
+  EOUT.blushL[3]=EOUT.blushL[4]=EOUT.blushR[3]=EOUT.blushR[4]=eCur.bs;
+}
 function rigLoop(ts){
   rigRaf = requestAnimationFrame(rigLoop);
   var dt = rigLast ? Math.min(0.045, (ts - rigLast)/1000) : 0.016;
   rigLast = ts;
   if(document.hidden) return;
-  if(R3 && R3.active){ cancelAnimationFrame(rigRaf); rigRaf = 0; return; }   // 3Dが描いている間は2Dを回さない
   if(REDUCED){ if(ts - rigStill < 200) return; rigStill = ts; }   // 動きを減らす設定：静止画として時々描き直すだけ
   rigT += dt;
+  if(faceHold && ts > faceHold){ faceHold = 0; if(!flap) setFace(faceBase); }
+  faceStep(dt);
+  // 3Dが描いている間は、体の計算はしない。表情（EOUT）だけ3Dに渡す
+  if(R3 && R3.active){ rigKick *= Math.pow(0.28, dt); r3("setFace", EOUT); return; }
   rigKick *= Math.pow(0.28, dt);
   tickBreathe();
-  if(faceHold && ts > faceHold){ faceHold = 0; if(!flap) setFace(faceBase); }
   var lively = dancing ? 1.9 : (S.energy < 22 ? 0.45 : S.mood < 30 ? 0.7 : 1);
   var amp = Math.min(2.2, lively + rigKick);
 
@@ -1751,19 +1772,7 @@ function rigLoop(ts){
   // 2) ばねで追う（ここで“間”と“行きすぎ”が生まれる）
   var v = {};
   for(var i=0;i<JKEYS.length;i++){ var k = JKEYS[i]; v[k] = REDUCED ? a[k] : JS_[k].step(a[k], dt); }
-  // 3) 表情をなめらかに寄せる
-  var ez = 1 - Math.exp(-24*dt);
-  flapV += (flap - flapV) * (1 - Math.exp(-14*dt));   // 口パクの出入りも滑らかに
-  var mf = 0.5 - 0.5*Math.cos((rigT-flapT)*TAU*4.6);
-  for(var j=0;j<EK.length;j++){
-    var kk = EK[j], cv = eCur[kk], tv = eTgt[kk];
-    for(var q=0;q<5;q++) cv[q] += (tv[q]-cv[q])*ez;
-    var out = EOUT[EMAP[kk]];
-    out[0]=cv[0]; out[1]=cv[1]; out[2]=cv[2]; out[3]=cv[3]; out[4]=cv[4];
-    if(kk === "mo" && flapV > 0.002) out[4] = cv[4] * (1 - flapV*(0.72 - 0.72*mf));
-  }
-  eCur.bs += (eTgt.bs-eCur.bs)*ez;
-  EOUT.blushL[3]=EOUT.blushL[4]=EOUT.blushR[3]=EOUT.blushR[4]=eCur.bs;
+  // 3) 表情は faceStep（上）で寄せてある
   // 4) ポニーテールは頭の“速さ”に引っぱられる（動いた方向と逆に流れる）
   var pa = REDUCED ? 0 : sPony.step(-(JS_.hr.v*0.052 + JS_.tr.v*0.030 + JS_.ry.v*0.055), dt);
   pa = Math.max(-22, Math.min(22, pa));
@@ -1888,6 +1897,7 @@ function applyLook(){
   eggEl.setAttribute("data-crack", String(Math.min(3, Math.floor(S.eggTaps/2))));
   // アクセ
   var acc = accById(S.acc);
+  r3("setAcc", acc.id);
   if(acc && acc.svg){
     if(accEl.getAttribute("data-id") !== acc.id){ accEl.innerHTML = acc.svg; accEl.setAttribute("data-id", acc.id); }
     accEl.style.setProperty("--aw", acc.aw); accEl.style.setProperty("--ax", acc.ax); accEl.style.setProperty("--ay", acc.ay);
@@ -1957,6 +1967,7 @@ function buildOutfit(id, cb){
   });
 }
 function applyOutfit(){
+  r3("setOutfit", outfitById(S.outfit));
   buildOutfit(S.outfit, function(url){
     var im = new Image();
     im.onload = function(){ uploadTex(im); };
