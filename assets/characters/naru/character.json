@@ -1,7 +1,7 @@
 {
   "characterId": "naru",
   "name": "なるねぇ",
-  "version": 9,
+  "version": 13,
   "sourceImage": "assets/characters/source/naru/front.png",
   "model": "assets/characters/optimized/naru/naru.glb",
   "animations": {
@@ -67,8 +67,9 @@
     }
   },
   "createdAt": "2026-09-29T05:53:24.095Z",
-  "updatedAt": "2026-09-29T08:51:57.847Z",
+  "updatedAt": "2026-09-29T09:37:54.697Z",
   "provenance": {
+    "body": "toon",
     "provider": "tripo",
     "modelTask": "013cc118-9adf-4f58-99bc-e02a54ae2e1c",
     "rigTask": "5617d936-e18d-4932-bb34-10190d371ee8",
@@ -89,5 +90,6 @@
       670
     ],
     "note": "元絵（1254px）の座標。features は顔パーツ（眉・目・口・ほっぺ）全体の外枠で、index.html の MESH.cells から。3Dの顔シートと表情はこれで位置を合わせる"
-  }
+  },
+  "shading": "toon"
 }

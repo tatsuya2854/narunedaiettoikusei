@@ -202,9 +202,9 @@
       }
     ]
   },
-  "updatedAt": "2026-09-29T08:51:57.851Z",
+  "updatedAt": "2026-09-29T09:37:54.699Z",
   "input": "assets/characters/source/naru/input.png",
-  "animatedFile": "assets/characters/animations/naru/5617d936-e18d-4932-bb34-10190d371ee8_procedural.glb",
+  "animatedFile": "assets/characters/animations/naru/toon.glb",
   "requestedAnimations": {
     "IDLE": "local:idle",
     "WALK": "local:walk",
@@ -216,7 +216,7 @@
   },
   "animatedFrom": {
     "model": "013cc118-9adf-4f58-99bc-e02a54ae2e1c",
-    "rig": "5617d936-e18d-4932-bb34-10190d371ee8",
+    "rig": "toon",
     "retarget": "procedural"
   },
   "retargetFiles": {
@@ -229,23 +229,15 @@
   "optimized": {
     "from": {
       "model": "013cc118-9adf-4f58-99bc-e02a54ae2e1c",
-      "rig": "5617d936-e18d-4932-bb34-10190d371ee8",
+      "rig": "toon",
       "retarget": "procedural"
     },
     "file": "assets/characters/optimized/naru/naru.glb",
-    "bytes": 242748,
+    "bytes": 156176,
     "before": {
-      "triangles": 22102,
-      "vertices": 12793,
+      "triangles": 32240,
+      "vertices": 16369,
       "textures": [
-        {
-          "size": [
-            2048,
-            2048
-          ],
-          "mime": "image/jpeg",
-          "bytes": 325441
-        },
         {
           "size": [
             2,
@@ -264,21 +256,13 @@
         "sleep",
         "eat"
       ],
-      "skins": 1,
-      "joints": 41
+      "skins": 9,
+      "joints": 189
     },
     "after": {
-      "triangles": 14998,
-      "vertices": 9179,
+      "triangles": 16080,
+      "vertices": 8289,
       "textures": [
-        {
-          "size": [
-            1024,
-            1024
-          ],
-          "mime": "image/webp",
-          "bytes": 40368
-        },
         {
           "size": [
             2,
@@ -297,8 +281,8 @@
         "sleep",
         "eat"
       ],
-      "skins": 1,
-      "joints": 41
+      "skins": 9,
+      "joints": 189
     },
     "clipMap": {
       "IDLE": "idle",
@@ -310,6 +294,7 @@
       "EAT": "eat"
     },
     "headBone": "Head",
-    "at": "2026-09-29T08:51:57.611Z"
-  }
+    "at": "2026-09-29T09:37:54.466Z"
+  },
+  "body": "toon"
 }

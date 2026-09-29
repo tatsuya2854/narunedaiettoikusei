@@ -4,7 +4,7 @@
 // ・重すぎる端末（平均 22fps 未満が続く）でも2Dに戻す（iPhone の発熱・電池を優先）
 import * as T from "./vendor/three-char.js";
 import { AnimationStateMachine } from "./state-machine.js";
-import { createFace, measureHead, createOutfitter } from "./look.js";
+import { createFace, measureHead, createOutfitter, toonGradient, applyToon } from "./look.js";
 import { attachAccessory, disposeObject, hasAccessory } from "./accessories.js";
 
 const FIT_H = 0.82;          // キャラの背丈が描画枠の高さに占める割合（2D の FIT に見た目を合わせた値）
@@ -61,7 +61,10 @@ export async function mount({ host, base = "./", characterId, reduced = false, o
     if (bone) sockets[name] = bone;
   }
   // 表情（顔シートに2Dの顔パーツを描く）・頭の大きさ・着せ替え。アニメを始める前（基本姿勢）に測る
-  const face = await createFace(model, faceInfo).catch((e) => { console.warn("表情の準備に失敗:", e); return null; });
+  // どうぶつの森風の体はトゥーン（アニメ調）の陰影
+  const gradient = cfg.shading === "toon" ? toonGradient() : null;
+  if (gradient) applyToon(model, gradient);
+  const face = await createFace(model, faceInfo, { toon: gradient }).catch((e) => { console.warn("表情の準備に失敗:", e); return null; });
   const head = sockets.head ? { ...measureHead(model, sockets.head), eyes: face?.eyes, boneRest: sockets.head.matrixWorld.clone() } : null;
   const outfitter = createOutfitter(model);
   let acc = null, accId = null;
@@ -182,6 +185,7 @@ export async function mount({ host, base = "./", characterId, reduced = false, o
     },
     state: () => ({ base: sm.base, current: sm.current, clip: sm.currentClip }),
     socket: (name) => sockets[name] || null,
+    debugHead: () => head && { c: head.c.toArray(), r: head.r.toArray(), eyes: head.eyes && [head.eyes.L?.toArray(), head.eyes.R?.toArray()], bone: new T.Vector3().setFromMatrixPosition(head.boneRest).toArray() },
     // 確認用：キャラを y 軸まわりに回して見る（度）
     turn: (deg) => { model.rotation.y = (deg * Math.PI) / 180 + ((cfg.rotation?.[1] || 0) * Math.PI) / 180; if (reduced) draw(0); },       // 今後: アクセ（サングラス等）を骨に付ける
     dispose,

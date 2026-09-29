@@ -3,7 +3,7 @@
     {
       "id": "naru",
       "config": "assets/characters/naru/character.json",
-      "version": 9,
+      "version": 13,
       "provider": "tripo"
     }
   ],

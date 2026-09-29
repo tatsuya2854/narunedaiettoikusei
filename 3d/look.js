@@ -6,7 +6,24 @@ import * as T from "./vendor/three-char.js";
  * 2Dと同じ表情の数値（EOUT：[dx, dy, 回転, 横倍率, 縦倍率]）で描く。目は2Dと同じく開かない（閉じた目のパーツしか無い）。
  * @param face { src, cells, scale, feat, ex }  index.html から渡される2Dの顔パーツ情報
  */
-export async function createFace(model, face) {
+/**
+ * どうぶつの森風のトゥーン（アニメ調）の陰影。明るい面・少し暗い面・影の3段で、境目はなめらかすぎない
+ */
+export function toonGradient() {
+  const t = new T.DataTexture(new Uint8Array([168, 214, 255]), 3, 1, T.RedFormat);
+  t.minFilter = t.magFilter = T.NearestFilter; t.generateMipmaps = false; t.needsUpdate = true;
+  return t;
+}
+export function applyToon(model, gradient) {
+  model.traverse((o) => {
+    if (!o.isMesh || o.name === "FacePatch") return;
+    const old = o.material;
+    o.material = new T.MeshToonMaterial({ color: old.color, gradientMap: gradient, name: old.name });
+    old.dispose();
+  });
+}
+
+export async function createFace(model, face, { toon = null } = {}) {
   const patch = model.getObjectByName("FacePatch");
   const mesh = patch?.isMesh ? patch : patch?.children?.find((c) => c.isMesh);
   if (!mesh || !face) return null;
@@ -29,8 +46,11 @@ export async function createFace(model, face) {
   let sumZ = 0; const tmp = new T.Vector3();
   for (let i = 0; i < nrm.count; i++) sumZ += tmp.fromBufferAttribute(nrm, i).applyMatrix3(nm).z;
   if (sumZ < 0) { for (let i = 0; i < nrm.count; i++) nrm.setXYZ(i, -nrm.getX(i), -nrm.getY(i), -nrm.getZ(i)); }
-  mesh.material = new T.MeshStandardMaterial({ map: tex, transparent: true, depthWrite: false, roughness: 0.9, metalness: 0,
-    polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+  // glTF の仮の材質（透明のダミーテクスチャ）は捨てる
+  for (const v of Object.values(mesh.material)) if (v?.isTexture) v.dispose();
+  mesh.material.dispose();
+  const common = { map: tex, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 };
+  mesh.material = toon ? new T.MeshToonMaterial({ ...common, gradientMap: toon }) : new T.MeshStandardMaterial({ ...common, roughness: 0.9, metalness: 0 });
   mesh.renderOrder = 2;
   // 2D と同じ計算：パーツの元の位置（元絵の座標）を中心に、回して伸ばして動かす
   const parts = face.feat.map((n) => {
@@ -73,8 +93,11 @@ export async function createFace(model, face) {
     let best = -1, bd = Infinity;
     for (let i = 0; i < uv.count; i++) { const d = (uv.getX(i) - u) ** 2 + (uv.getY(i) - v) ** 2; if (d < bd) { bd = d; best = i; } }
     if (best < 0) return null;
+    const at = new T.Vector3();
+    // スキン付きの顔シートは、骨の変形を通した位置で取る
+    if (mesh.isSkinnedMesh) { mesh.updateWorldMatrix(true, true); mesh.skeleton.update(); mesh.getVertexPosition(best, at); return at.applyMatrix4(mesh.matrixWorld); }
     mesh.updateWorldMatrix(true, false);
-    return new T.Vector3(pos.getX(best), pos.getY(best), pos.getZ(best)).applyMatrix4(mesh.matrixWorld);
+    return at.set(pos.getX(best), pos.getY(best), pos.getZ(best)).applyMatrix4(mesh.matrixWorld);
   };
   return { draw, eyes: { L: eyeAt("eyeL"), R: eyeAt("eyeR") }, dispose: () => { tex.dispose(); mesh.material.dispose(); } };
 }
@@ -88,17 +111,22 @@ export function measureHead(model, headBone) {
   const neckY = new T.Vector3().setFromMatrixPosition(headBone.matrixWorld).y;
   const xs = [], ys = [], zs = [];
   const v = new T.Vector3();
+  // 手元で作った体は、頭（肌）と帽子だけで測る（耳・ポニーテール・点を入れると大きく出る）
+  const only = model.getObjectByName("Hood") ? new Set(["Hood", "Head_skin"]) : null;
   model.traverse((o) => {
-    if (!o.isSkinnedMesh) return;
+    if (!o.isSkinnedMesh || o.name === "FacePatch" || (only && !only.has(o.name))) return;
+    o.skeleton.update();   // 骨の行列を今の位置に（まだ一度も描いていないと古いままで、頭の位置がずれる）
     const pos = o.geometry.attributes.position;
     for (let i = 0; i < pos.count; i += 2) {
-      o.getVertexPosition(i, v); v.applyMatrix4(o.matrixWorld);
+      // 骨の行列にモデルの位置合わせ（ずらし）がすでに入っているので、matrixWorld は掛けない。
+      // 掛けると頭の中心が二重にずれる（実測：顔の中心と頭の骨で確認）
+      o.getVertexPosition(i, v);
       if (v.y > neckY) { xs.push(v.x); ys.push(v.y); zs.push(v.z); }
     }
   });
   const pts = xs.map((x, i) => new T.Vector3(x, ys[i], zs[i]));
   const q = (a, p) => { const b = [...a].sort((x, y) => x - y); return b[Math.floor((b.length - 1) * p)]; };
-  const x0 = q(xs, 0.08), x1 = q(xs, 0.92), y0 = neckY, y1 = q(ys, 0.97), z0 = q(zs, 0.03), z1 = q(zs, 0.97);
+  const x0 = q(xs, only ? 0.005 : 0.08), x1 = q(xs, only ? 0.995 : 0.92), y0 = neckY, y1 = q(ys, only ? 0.995 : 0.97), z0 = q(zs, only ? 0.005 : 0.03), z1 = q(zs, only ? 0.995 : 0.97);
   const c = new T.Vector3((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2);
   const r = new T.Vector3((x1 - x0) / 2, (y1 - y0) / 2, (z1 - z0) / 2);
   /**
@@ -124,6 +152,14 @@ export function measureHead(model, headBone) {
  * モデルを作り直さない（クレジットを使わない）。
  */
 export function createOutfitter(model) {
+  // 手元で作った体（どうぶつの森風）は、シャツ・短パンが別々の材質なので色を変えるだけ
+  const byName = {};
+  model.traverse((o) => { if (o.isMesh && o.material?.name) (byName[o.material.name] ||= []).push(o.material); });
+  if (byName.shirt && byName.shorts) {
+    const base = { shirt: byName.shirt[0].color.clone(), shorts: byName.shorts[0].color.clone() };
+    const set = (name, hsl) => byName[name].forEach((m) => (hsl ? m.color.setHSL(hsl[0] / 360, hsl[1], hsl[2], T.SRGBColorSpace) : m.color.copy(base[name])));
+    return { apply: (o) => { set("shirt", o?.shirt); set("shorts", o?.shorts); }, dispose: () => {} };
+  }
   let mesh = null;
   model.traverse((o) => { if (!mesh && o.isSkinnedMesh && o.material?.map) mesh = o; });
   if (!mesh) return null;

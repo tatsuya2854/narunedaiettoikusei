@@ -13,7 +13,7 @@ const server = createServer(async (q, r) => { try { const p = join(root, decodeU
 await new Promise((r) => server.once("listening", r));
 const b = await chromium.launch({ args: ["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader"] });
 const p = await (await b.newContext({ ...devices["iPhone 13"] })).newPage();
-p.on("pageerror", (e) => console.log("pageerror", e.message));
+p.on("pageerror", (e) => console.log("pageerror", e.message)); p.on("console", (m) => { if (m.type() === "warning" && !/GPU stall/.test(m.text())) console.log("warn", m.text().slice(0, 300)); });
 await p.goto(`http://127.0.0.1:${server.address().port}/index.html?r=3d`);
 await p.waitForFunction(() => window.__naru?.r3()?.active);
 await p.evaluate(() => { const n = window.__naru; n.set({ stage: 2, hatched: true, careDays: 5, mood: 70, energy: 80 }); n.unlockAll(); });

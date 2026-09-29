@@ -25,7 +25,8 @@ export const ACCESSORIES = {
     };
     g.add(loop(1), loop(-1));
     const knot = new T.Mesh(new T.SphereGeometry(0.34, 16, 12), mat(0xe8456f)); g.add(knot);
-    return place(g, h.c.clone().add(new T.Vector3(h.r.x * 0.5, h.r.y * 0.78, h.r.z * 0.1)), [0.1, 0, -0.45], s);
+    // 耳の内側・おでこの上の斜めに、しっかり見える大きさで
+    return place(g, h.c.clone().add(new T.Vector3(-h.r.x * 0.42, h.r.y * 0.92, h.r.z * 0.45)), [-0.3, 0, 0.35], s * 1.5);
   },
   // おはな：頭の右上（見る人の左上）に、白い花びらと黄色い真ん中
   flower(h) {
@@ -35,7 +36,7 @@ export const ACCESSORIES = {
       p.scale.set(1, 1, 0.45); p.position.set(Math.cos(a) * 0.72, Math.sin(a) * 0.72, 0); g.add(p);
     }
     const c = new T.Mesh(new T.SphereGeometry(0.46, 16, 12), center); c.scale.set(1, 1, 0.6); c.position.z = 0.15; g.add(c);
-    return place(g, h.c.clone().add(new T.Vector3(-h.r.x * 0.55, h.r.y * 0.7, h.r.z * 0.35)), [-0.35, -0.45, 0.3], s);
+    return place(g, h.c.clone().add(new T.Vector3(-h.r.x * 0.5, h.r.y * 0.82, h.r.z * 0.6)), [-0.55, -0.35, 0.25], s * 1.4);
   },
   // ハチマキ：おでこの高さで、頭の形にぴったり沿って一周。うしろで結び目がぴょこっと出る
   band(h) {
@@ -107,7 +108,7 @@ export const ACCESSORIES = {
       const ball = new T.Mesh(new T.SphereGeometry(0.12, 10, 8), gold); ball.position.set(Math.sin(a) * 0.9, 0.9, Math.cos(a) * 0.9); g.add(ball);
     }
     const jewel = new T.Mesh(new T.SphereGeometry(0.2, 14, 10), gem); jewel.position.set(0, 0, 1.0); g.add(jewel);
-    return place(g, h.c.clone().add(new T.Vector3(h.r.x * 0.12, h.r.y * 0.9, 0)), [0.05, 0, -0.18], h.r.y * 0.42);
+    return place(g, h.c.clone().add(new T.Vector3(h.r.x * 0.05, h.r.y * 1.02, h.r.z * 0.05)), [0.05, 0, -0.1], h.r.y * 0.55);
   },
 };
 

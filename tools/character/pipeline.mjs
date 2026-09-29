@@ -17,6 +17,10 @@ import { logFailure } from "./lib/guard.mjs";
 import { optimizeGlb, makeIO, mergeAnimations } from "./lib/optimize.mjs";
 import { removeSideLines } from "./lib/line-cleanup.mjs";
 import { addProceduralClip } from "./lib/procedural-clips.mjs";
+import { buildToonCharacter, buildFaceSheet } from "./lib/toon-model.mjs";
+import { GLTFExporter } from "three/examples/jsm/exporters/GLTFExporter.js";
+import * as THREE from "three";
+import { writeFile } from "node:fs/promises";
 
 const exists = (p) => access(p).then(() => true, () => false);
 const rel = (p) => relative(ROOT, p);
@@ -191,6 +195,46 @@ async function makeReviewPreview(cfg, file, taskId) {
   return rel(out);
 }
 
+/**
+ * どうぶつの森風の体で作る（Tripo のメッシュは使わない・無料）。
+ * AI のメッシュは表面がデコボコで比率も崩れるので、元絵の比率どおりに単純な形から作り、骨・顔シート・動きを付ける。
+ */
+export async function toon({ id }) {
+  const P = charPaths(id), cfg = await loadCfg(P), p = await loadPipeline(P);
+  const built = buildToonCharacter();
+  // 顔シート（頭と一緒に動くよう、重み Head のスキン）
+  const face = cfg.face;
+  if (face) {
+    const g = buildFaceSheet(built, { rect: face.rect });
+    const n = g.attributes.position.count, bi = built.skeleton.bones.findIndex((b) => b.name === "Head");
+    g.setAttribute("skinIndex", new THREE.Uint16BufferAttribute(new Array(n).fill(0).flatMap(() => [bi, 0, 0, 0]), 4));
+    g.setAttribute("skinWeight", new THREE.Float32BufferAttribute(new Array(n).fill(0).flatMap(() => [1, 0, 0, 0]), 4));
+    const m = new THREE.SkinnedMesh(g, new THREE.MeshStandardMaterial({ name: "FacePatch", transparent: true, opacity: 0 }));
+    m.name = "FacePatch"; m.userData.faceRect = face.rect; m.bind(built.skeleton); built.root.add(m);
+  }
+  const scene = new THREE.Scene(); scene.add(built.root);
+  const glb = Buffer.from(await new GLTFExporter().parseAsync(scene, { binary: true }));
+  const out = join(P.animations, "toon.glb");
+  await mkdir(P.animations, { recursive: true });
+  await writeFile(out, glb);
+  // 動き（どうぶつの森風のレシピ）と、顔シートのダミーテクスチャ（UV を残すため）
+  const io = await makeIO();
+  const doc = await io.read(out);
+  const states = cfg.generation.proceduralAnimations || { IDLE: "idle", WALK: "walk", JUMP: "jump", HAPPY: "happy", DANCE: "dance", SLEEP: "sleep", EAT: "eat" };
+  for (const name of Object.values(states)) addProceduralClip(doc, name, { forward: [0, 0, 1], up: [0, 1, 0] });
+  const fm = doc.getRoot().listMaterials().find((m) => m.getName() === "FacePatch");
+  if (fm) fm.setAlphaMode("BLEND").setBaseColorFactor([1, 1, 1, 0]).setBaseColorTexture(doc.createTexture("FacePatch").setMimeType("image/png").setImage(await placeholderPng()));
+  await io.write(out, doc);
+  p.animatedFile = rel(out); p.stage = "animated"; p.body = "toon";
+  p.requestedAnimations = Object.fromEntries(Object.entries(states).map(([s, n]) => [s, `local:${n}`]));
+  p.animatedFrom = { model: p.review?.taskId || "toon", rig: "toon", retarget: "procedural" };
+  await savePipeline(P, p);
+  console.log(`どうぶつの森風の体: ${rel(out)}（メッシュ ${built.meshes.length}・動き ${Object.keys(states).length}本）`);
+}
+async function placeholderPng() {
+  return new Uint8Array(await sharp(Buffer.from([255, 255, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 255, 255, 255, 0]), { raw: { width: 2, height: 2, channels: 4 } }).png().toBuffer());
+}
+
 /** 既にある候補の確認用プレビューを作り直す（線の消し方を調整したとき） */
 export async function preview({ id }) {
   const P = charPaths(id), cfg = await loadCfg(P), p = await loadPipeline(P);
@@ -330,11 +374,11 @@ export async function animate({ id, guard, provider, allowRecreate = false }) {
 export async function optimize({ id }) {
   const P = charPaths(id), cfg = await loadCfg(P), p = await loadPipeline(P);
   if (!p.animatedFile) throw new Error("先に animate してください");
-  if (p.animatedFrom?.model !== p.review?.taskId) throw new Error(`アニメ付きモデルは採用中のモデル（${p.review?.taskId}）から作られたものではありません。rig / animate からやり直してください`);
+  if (p.body !== "toon" && p.animatedFrom?.model !== p.review?.taskId) throw new Error(`アニメ付きモデルは採用中のモデル（${p.review?.taskId}）から作られたものではありません。rig / animate からやり直してください`);
   const out = join(P.optimized, `${id}.glb`);
   await mkdir(P.optimized, { recursive: true });
   // Tripo の出力は +X 正面。mock は +Z 正面で作ってある
-  const isMock = String(p.animatedFrom?.model || "").startsWith("mock-");
+  const isMock = String(p.animatedFrom?.model || "").startsWith("mock-") || p.body === "toon";   // 手元で作った体は +Z 正面・テクスチャなし
   const rotateYDeg = cfg.optimize.rotateYDeg ?? (isMock ? 0 : -90);
   const sideLines = cfg.optimize.sideLines === false || isMock ? null : { forward: [1, 0, 0], ...(cfg.optimize.sideLines || {}) };
   // 表情（顔シート）は character.json の face があり、Tripo のモデルのときだけ
@@ -350,12 +394,13 @@ export async function optimize({ id }) {
 export async function register({ id }) {
   const P = charPaths(id), cfg = await loadCfg(P), p = await loadPipeline(P);
   if (!p.optimized) throw new Error("先に optimize してください");
-  if (p.optimized.from?.model !== p.review?.taskId) throw new Error("最適化済みモデルが採用中のモデルと合いません。optimize からやり直してください");
+  if (p.body !== "toon" && p.optimized.from?.model !== p.review?.taskId) throw new Error("最適化済みモデルが採用中のモデルと合いません。optimize からやり直してください");
   cfg.model = p.optimized.file;
   cfg.animations = p.optimized.clipMap;
   if (p.optimized.headBone) cfg.sockets.head = { ...(cfg.sockets.head || {}), bone: p.optimized.headBone };
   cfg.version = (cfg.version || 0) + 1;
-  cfg.provenance = { provider: p.tasks.model?.taskId?.startsWith("mock-") ? "mock" : "tripo", modelTask: p.review.taskId, rigTask: p.tasks.rig?.taskId, retargetTask: p.tasks.retarget?.taskId, approvedBy: p.review.reviewer, approvedAt: p.review.at };
+  cfg.shading = p.body === "toon" ? "toon" : "standard";
+  cfg.provenance = { body: p.body || "tripo", provider: p.tasks.model?.taskId?.startsWith("mock-") ? "mock" : "tripo", modelTask: p.review.taskId, rigTask: p.tasks.rig?.taskId, retargetTask: p.tasks.retarget?.taskId, approvedBy: p.review.reviewer, approvedAt: p.review.at };
   cfg.updatedAt = now();
   await writeJson(P.config, cfg);
   const idxPath = join(CHAR_DIR, "index.json");
