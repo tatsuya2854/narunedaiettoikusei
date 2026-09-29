@@ -73,11 +73,21 @@ test("クリップが1つも無くても落ちない", () => {
   assert.equal(sm.resolve("JUMP"), null);
 });
 
-test("長いワンショット（cheer 12秒など）はゲームの演出に合わせて切り上げる", () => {
-  const { sm } = rig({ IDLE: "idle", HAPPY: "cheer" }, { idle: 15, cheer: 12.1 });
+test("ワンショット: ジャンプは1回きり、ほかはゲームの演出の長さだけ繰り返して戻る", () => {
+  const { sm, log } = rig({ IDLE: "idle", HAPPY: "cheer", JUMP: "jump" }, { idle: 2, cheer: 12.1, jump: 0.9 });
+  sm.trigger("JUMP", 2);
+  assert.deepEqual(log.at(-1), ["jump", false]);
+  sm.tick(1.9); assert.equal(sm.current, "IDLE");
   sm.trigger("HAPPY", 1.3);
-  sm.tick(2.0); assert.equal(sm.current, "HAPPY");
-  sm.tick(1.0); assert.equal(sm.current, "IDLE");
+  assert.deepEqual(log.at(-1), ["cheer", true]);
+  sm.tick(1.0); assert.equal(sm.current, "HAPPY");
+  sm.tick(0.2); assert.equal(sm.current, "IDLE");   // 演出（1.3秒）が終わるころに戻る。12秒の動きでも引っぱらない
   sm.trigger("HAPPY");
   sm.tick(4.0); assert.equal(sm.current, "IDLE");
+});
+
+test("ジャンプが無いキャラで喜ぶを代わりに使っても、繰り返さない", () => {
+  const { sm, log } = rig({ IDLE: "idle", HAPPY: "happy" }, { idle: 2, happy: 1.2 });
+  sm.trigger("JUMP");
+  assert.deepEqual(log.at(-1), ["happy", false]);
 });

@@ -8,7 +8,7 @@ import { parseArgs } from "node:util";
 import sharp from "sharp";
 import { ROOT } from "./lib/paths.mjs";
 
-const { values: o, positionals: [model, out] } = parseArgs({ allowPositionals: true, options: { rotate: { type: "string" }, source: { type: "string" }, times: { type: "string" }, clip: { type: "string" } } });
+const { values: o, positionals: [model, out] } = parseArgs({ allowPositionals: true, options: { rotate: { type: "string" }, source: { type: "string" }, times: { type: "string" }, clip: { type: "string" }, dir: { type: "string" }, size: { type: "string" } } });
 const rot = Number(o.rotate || 0);
 const T = { ".html": "text/html", ".js": "text/javascript", ".glb": "model/gltf-binary", ".png": "image/png" };
 const page = `<!doctype html><html><body style="margin:0;background:#fff">
@@ -45,15 +45,15 @@ try {
     // アニメの途中のコマを正面から並べる（動きの確認用）
     console.log("clips:", await p.evaluate(() => window.clips));
     for (const t of o.times.split(",").map(Number)) {
-      const url = await p.evaluate(([tt]) => { window.at(tt); return window.shot([0.5, 0, 1]); }, [t]);
+      const url = await p.evaluate(([tt, d]) => { window.at(tt); return window.shot(d); }, [t, (o.dir || "0.5,0,1").split(",").map(Number)]);
       tiles.push(Buffer.from(url.split(",")[1], "base64"));
     }
   } else for (const dir of [[0, 0, 1], [1, 0, 0], [0.7, 0, 0.7], [-1, 0, 0], [0, 0, -1]]) {
     const url = await p.evaluate((d) => window.shot(d), dir);
     tiles.push(Buffer.from(url.split(",")[1], "base64"));
   }
-  const imgs = await Promise.all(tiles.map((t) => sharp(t).resize(360, 360, { fit: "contain", background: "#fff" }).toBuffer()));
-  await sharp({ create: { width: 360 * imgs.length, height: 360, channels: 3, background: "#fff" } })
-    .composite(imgs.map((d, i) => ({ input: d, left: i * 360, top: 0 }))).png().toFile(out);
+  const imgs = await Promise.all(tiles.map((t) => sharp(t).resize(Number(o.size || 360), Number(o.size || 360), { fit: "contain", background: "#fff" }).toBuffer()));
+  await sharp({ create: { width: Number(o.size || 360) * imgs.length, height: Number(o.size || 360), channels: 3, background: "#fff" } })
+    .composite(imgs.map((d, i) => ({ input: d, left: i * Number(o.size || 360), top: 0 }))).png().toFile(out);
   console.log(`wrote ${out}`);
 } finally { await b.close(); server.close(); }

@@ -102,6 +102,7 @@ await check("3D: 読み込み・状態の切り替え・2Dを隠す", async () =
     // 直前の食事で進化の演出（喜ぶ）が遅れて重なることがあるので、ベースが「寝る」になったかを見る
     assert.equal((await page.evaluate(() => window.__naru.r3().state())).base, "SLEEP");
     await page.waitForFunction(() => window.__naru.r3().state().clip === "sleep", null, { timeout: 8000 });
+    await page.waitForTimeout(1200);   // クロスフェードが終わってから撮る
     if (out) await page.screenshot({ path: `${out}/3d-sleep.png` });
     await page.evaluate(() => window.__naru.set({ energy: 80 }));
   }

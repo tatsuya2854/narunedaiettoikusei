@@ -258,12 +258,32 @@ async function checkRetarget(file, firstFile) {
   if (missing.length) throw new Error(`${rel(file)}: 1本目に無い骨 ${[...new Set(missing)].slice(0, 5).join(", ")}。ここで止めます`);
 }
 
+// 動きを全部手元で作る（既定）。Tripo のプリセットは人間のモーションキャプチャで、三頭身だとフニャフニャになり、
+// 手首も丸まる。なので骨（リグ）だけ Tripo に入れてもらい、動きは「どうぶつの森」風のレシピから作る（無料）
+async function animateProcedural({ P, cfg, p }) {
+  const g = cfg.generation;
+  const states = g.proceduralAnimations || { IDLE: "idle", WALK: "walk", JUMP: "jump", HAPPY: "happy", DANCE: "dance", SLEEP: "sleep", EAT: "eat" };
+  const rigged = join(P.animations, `${p.tasks.rig.taskId}_rigged.glb`);
+  const out = join(P.animations, `${p.tasks.rig.taskId}_procedural.glb`);
+  const io = await makeIO();
+  const doc = await io.read(rigged);
+  for (const a of doc.getRoot().listAnimations()) a.dispose();
+  for (const name of Object.values(states)) addProceduralClip(doc, name, { forward: [1, 0, 0], up: [0, 1, 0] });
+  await io.write(out, doc);
+  p.animatedFile = rel(out); p.stage = "animated";
+  p.requestedAnimations = Object.fromEntries(Object.entries(states).map(([s, n]) => [s, `local:${n}`]));
+  p.animatedFrom = { model: p.review.taskId, rig: p.tasks.rig.taskId, retarget: "procedural" };
+  await savePipeline(P, p);
+  console.log(`動き（手元で作成・${Object.keys(states).length}本）: ${rel(out)}`);
+}
+
 // Tripo の retarget は animations に複数入れても、返ってくる GLB には最後の1本しか入っていなかった
 // （2026-09-29 実測。4本ぶん 40 クレジット消費して cheer だけ）。なので1タスク1本で頼み、手元で1ファイルにまとめる
 export async function animate({ id, guard, provider, allowRecreate = false }) {
   const P = charPaths(id), cfg = await loadCfg(P), g = cfg.generation, p = await loadPipeline(P);
   requireApproved(p, id);
   if (p.tasks.rig?.status !== "success") throw new Error("先に rig してください");
+  if ((g.motion || "procedural") === "procedural") return animateProcedural({ P, cfg, p });
   // 旧方式（まとめて1タスク）の結果は、実際に入っていた最後の1本として引き継ぐ（作り直さない）
   const states = Object.keys(g.animations);
   if (p.tasks.retarget && !p.tasks[`retarget:${states.at(-1)}`] && p.tasks.retarget.status === "success") {

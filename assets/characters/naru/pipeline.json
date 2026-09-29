@@ -202,28 +202,22 @@
       }
     ]
   },
-  "updatedAt": "2026-09-29T07:19:15.890Z",
+  "updatedAt": "2026-09-29T08:09:11.857Z",
   "input": "assets/characters/source/naru/input.png",
-  "animatedFile": "assets/characters/animations/naru/5617d936-e18d-4932-bb34-10190d371ee8_merged.glb",
+  "animatedFile": "assets/characters/animations/naru/5617d936-e18d-4932-bb34-10190d371ee8_procedural.glb",
   "requestedAnimations": {
-    "IDLE": "preset:biped:idle",
-    "WALK": "preset:biped:walk",
-    "JUMP": "preset:biped:jump",
-    "HAPPY": "preset:biped:cheer",
-    "DANCE": "preset:biped:dance_01",
+    "IDLE": "local:idle",
+    "WALK": "local:walk",
+    "JUMP": "local:jump",
+    "HAPPY": "local:happy",
+    "DANCE": "local:dance",
     "SLEEP": "local:sleep",
     "EAT": "local:eat"
   },
   "animatedFrom": {
     "model": "013cc118-9adf-4f58-99bc-e02a54ae2e1c",
     "rig": "5617d936-e18d-4932-bb34-10190d371ee8",
-    "retarget": [
-      "11349cb0-4b9d-4337-a8cb-79152d058efd",
-      "acf2b097-7ad3-4aee-9679-6e321338c468",
-      "5744b488-3257-4115-8d3d-4b92883a246c",
-      "35932e39-d0e8-497c-bbc8-5d3a995d5ec0",
-      "da6dc802-cbe4-47a1-8374-c276d2b4c512"
-    ]
+    "retarget": "procedural"
   },
   "retargetFiles": {
     "HAPPY": "assets/characters/animations/naru/35932e39-d0e8-497c-bbc8-5d3a995d5ec0_animated.glb",
@@ -236,16 +230,10 @@
     "from": {
       "model": "013cc118-9adf-4f58-99bc-e02a54ae2e1c",
       "rig": "5617d936-e18d-4932-bb34-10190d371ee8",
-      "retarget": [
-        "11349cb0-4b9d-4337-a8cb-79152d058efd",
-        "acf2b097-7ad3-4aee-9679-6e321338c468",
-        "5744b488-3257-4115-8d3d-4b92883a246c",
-        "35932e39-d0e8-497c-bbc8-5d3a995d5ec0",
-        "da6dc802-cbe4-47a1-8374-c276d2b4c512"
-      ]
+      "retarget": "procedural"
     },
     "file": "assets/characters/optimized/naru/naru.glb",
-    "bytes": 807572,
+    "bytes": 251360,
     "before": {
       "triangles": 18906,
       "vertices": 11112,
@@ -263,8 +251,8 @@
         "idle",
         "walk",
         "jump",
-        "cheer",
-        "dance_01",
+        "happy",
+        "dance",
         "sleep",
         "eat"
       ],
@@ -272,8 +260,8 @@
       "joints": 41
     },
     "after": {
-      "triangles": 15000,
-      "vertices": 9117,
+      "triangles": 14994,
+      "vertices": 9112,
       "textures": [
         {
           "size": [
@@ -306,6 +294,6 @@
       "EAT": "eat"
     },
     "headBone": "Head",
-    "at": "2026-09-29T07:19:15.690Z"
+    "at": "2026-09-29T08:09:11.649Z"
   }
 }

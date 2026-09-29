@@ -1,7 +1,7 @@
 {
   "characterId": "naru",
   "name": "なるねぇ",
-  "version": 3,
+  "version": 5,
   "sourceImage": "assets/characters/source/naru/front.png",
   "model": "assets/characters/optimized/naru/naru.glb",
   "animations": {
@@ -47,7 +47,14 @@
     },
     "inputImage": "assets/characters/source/naru/front_nolines_v2.png",
     "inputImageNote": "ChatGPT（Codex の image_gen）で元絵の黒い輪郭線だけを消した版。顔の線・ほっぺ・帽子の点は残す。デザインの正は sourceImage",
-    "localAnimations": {
+    "motion": "procedural",
+    "motionNote": "動きは Tripo のプリセットを使わず、tools/character/lib/procedural-clips.mjs のレシピ（どうぶつの森風）で作る。Tripo はリグだけ",
+    "proceduralAnimations": {
+      "IDLE": "idle",
+      "WALK": "walk",
+      "JUMP": "jump",
+      "HAPPY": "happy",
+      "DANCE": "dance",
       "SLEEP": "sleep",
       "EAT": "eat"
     }
@@ -60,7 +67,7 @@
     }
   },
   "createdAt": "2026-09-29T05:53:24.095Z",
-  "updatedAt": "2026-09-29T07:19:15.888Z",
+  "updatedAt": "2026-09-29T08:09:11.855Z",
   "provenance": {
     "provider": "tripo",
     "modelTask": "013cc118-9adf-4f58-99bc-e02a54ae2e1c",

@@ -12,6 +12,9 @@
 export const BASE_STATES = ["IDLE", "WALK", "RUN", "SLEEP", "SAD", "DANCE"];
 export const ONESHOT_STATES = ["JUMP", "HAPPY", "EAT", "LEVEL_UP", "WAVE", "PET", "ANGRY"];
 
+// 繰り返さずに1回で終えるワンショット
+export const ONCE_STATES = ["JUMP"];
+
 export const FALLBACK = {
   RUN: "WALK", DANCE: "HAPPY", EAT: "HAPPY", LEVEL_UP: "HAPPY", WAVE: "HAPPY", PET: "HAPPY",
   SAD: "IDLE", SLEEP: "IDLE", ANGRY: "SAD", WALK: "IDLE", JUMP: "HAPPY", HAPPY: "IDLE",
@@ -76,11 +79,14 @@ export class AnimationStateMachine {
   /** ワンショットを割り込ませる。minSec があればそれより短くは終わらせない（ゲーム側の演出の長さに合わせる） */
   trigger(state, minSec = 0) {
     if (BASE_STATES.includes(state)) { this.setBase(state); return; }
-    const dur = this._play(state, false);
-    // Tripo のプリセットには長いもの（cheer は12秒）があるので、ゲームの演出に合わせて切り上げる。
-    // ゲームが長さを渡したらそれ以上・最長3秒、渡さなければ最長4秒
-    const len = Math.min(dur, minSec > 0 ? Math.max(minSec, 3) : 4);
-    this.oneShotLeft = Math.max(len - this.fade, minSec, 0.01);
+    // ジャンプは1回きり。ほかのワンショット（喜ぶ・食べる…）は、ゲームの演出のあいだ繰り返す
+    // 1回きりかどうかは「頼まれた状態」で決める（ジャンプが無くて喜ぶで代用するときも、繰り返さない）
+    const once = ONCE_STATES.includes(state);
+    const dur = this._play(state, !once);
+    // 戻る時刻：ゲームが演出の長さを渡したら、それに合わせる（1回きりのものは動きの長さより短くしない）。
+    // 渡されなければ動きの長さ（長くても4秒）
+    const len = minSec > 0 ? (once ? Math.max(minSec, dur) : minSec) : Math.min(dur, 4);
+    this.oneShotLeft = Math.max(len - this.fade, 0.01);
   }
 
   /** 毎フレーム呼ぶ。ワンショットが終わったらベースへ戻す */
