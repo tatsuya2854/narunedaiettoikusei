@@ -87,7 +87,7 @@ document.getElementById("overlay").src = "/" + (st.input || st.sourceImage);
 
 // 候補（最新が先頭）。アニメ済み・最適化済みがあればそれも見られる
 const which = document.getElementById("which");
-const opts = [...st.candidates].reverse().map((c) => ({ label: `候補 ${c.taskId.slice(0, 13)}… ${c.decision ? `（${c.decision}）` : "（未確認）"}`, file: c.file, taskId: c.taskId }));
+const opts = [...st.candidates].reverse().map((c) => ({ label: `候補 ${c.taskId.slice(0, 13)}… ${c.decision ? `（${c.decision}）` : "（未確認）"}`, file: c.preview || c.file, taskId: c.taskId }));
 if (st.animated) opts.unshift({ label: "アニメ付き（リグ後）", file: st.animated });
 if (st.optimized) opts.unshift({ label: "最適化後（ゲームで使うもの）", file: st.optimized });
 opts.forEach((o, i) => which.add(new Option(o.label, i)));
@@ -98,7 +98,7 @@ renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 host.prepend(renderer.domElement);
 const scene = new THREE.Scene();
-scene.add(new THREE.HemisphereLight(0xffffff, 0xb8a898, 2.2));
+scene.add(new THREE.HemisphereLight(0xffffff, 0xd8cabd, 3.0));
 const sun = new THREE.DirectionalLight(0xffffff, 1.4); sun.position.set(1, 2, 3); scene.add(sun);
 const cam = new THREE.PerspectiveCamera(30, 1, 0.01, 100);
 const ctl = new OrbitControls(cam, renderer.domElement);
@@ -117,7 +117,10 @@ async function load(i) {
   const g = await loader.loadAsync("/" + o.file);
   if (my !== gen) return;   // 後から選んだ候補が先に来ていたら、古い方は捨てる
   if (root) scene.remove(root);
-  root = g.scene; scene.add(root);
+  root = g.scene;
+  // Tripo の生出力は +X が正面なので、正面ボタンで顔が見えるよう -90° 回して見せる（最適化後は焼き込み済み）
+  if (o.taskId && !o.taskId.startsWith("mock-")) { const w = new THREE.Group(); w.add(root); w.rotation.y = -Math.PI / 2; root = w; }
+  scene.add(root);
   const box = new THREE.Box3().setFromObject(root); box.getCenter(center); radius = box.getSize(new THREE.Vector3()).length() / 2;
   ctl.target.copy(center);
   setView("front");

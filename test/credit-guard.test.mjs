@@ -59,3 +59,24 @@ test("キーの形が違えば使わない", () => {
   assert.throws(() => new TripoApiProvider({ apiKey: "tcli_abc", pricing: loadPricing() }));
   assert.throws(() => new TripoApiProvider({ apiKey: "", pricing: loadPricing() }));
 });
+
+test("v3: リクエストの形は公式ドキュメントどおり・出力名を読み替える", async () => {
+  const { TripoV3Provider } = await import("../tools/character/providers/tripo-v3.mjs");
+  const seen = [];
+  const fetchImpl = async (url, o) => {
+    seen.push([o?.method || "GET", url, o?.body && typeof o.body === "string" ? JSON.parse(o.body) : null]);
+    if (url.endsWith("/tasks/task_r")) return new Response(JSON.stringify({ code: 0, data: { task_id: "task_r", status: "success", progress: 100, output: { model_url: "https://cdn/x.glb" }, credits_consumed: 25 } }));
+    return new Response(JSON.stringify({ code: 0, data: { task_id: "task_r" } }));
+  };
+  const p = new TripoV3Provider({ apiKey: KEY, pricing: loadPricing(), fetchImpl });
+  await p.startImageToModel({ file: "file_1", modelVersion: "v3.1-20260211", faceLimit: 20000 });
+  assert.equal(seen[0][1], "https://openapi.tripo3d.ai/v3/generation/image-to-model");
+  assert.deepEqual(seen[0][2], { input: "file_1", model: "v3.1-20260211", texture: true, pbr: false, texture_quality: "standard", texture_alignment: "original_image", face_limit: 20000 });
+  await p.startRig({ modelTaskId: "task_m" });
+  assert.deepEqual(seen[1][2], { input: "task_m", model: "v1.0-20240301", rig_type: "biped", spec: "tripo", out_format: "glb" });
+  await p.startRetarget({ rigTaskId: "task_r", animations: ["preset:idle", "preset:biped:cheer"] });
+  assert.equal(seen[2][1], "https://openapi.tripo3d.ai/v3/animations/retarget");
+  assert.deepEqual(seen[2][2].animations, ["preset:biped:idle", "preset:biped:cheer"]);
+  const r = await p.waitTask("task_r");
+  assert.equal(r.output.model, "https://cdn/x.glb"); assert.equal(r.consumedCredits, 25);
+});

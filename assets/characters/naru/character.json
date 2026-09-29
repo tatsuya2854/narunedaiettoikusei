@@ -36,15 +36,18 @@
     "rigType": "biped",
     "rigVersion": "v1.0-20240301",
     "animations": {
-      "IDLE": "preset:idle",
-      "WALK": "preset:walk",
-      "JUMP": "preset:jump",
-      "HAPPY": "preset:cheer"
+      "IDLE": "preset:biped:idle",
+      "WALK": "preset:biped:walk",
+      "JUMP": "preset:biped:jump",
+      "HAPPY": "preset:biped:cheer"
     }
   },
   "optimize": {
     "maxTextureSize": 1024,
-    "maxTriangles": 15000
+    "maxTriangles": 15000,
+    "sideLines": {
+      "keepFacing": 0.8
+    }
   },
   "createdAt": "2026-09-29T05:53:24.095Z",
   "updatedAt": "2026-09-29T05:53:47.153Z",

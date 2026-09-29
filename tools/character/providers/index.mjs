@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { ROOT } from "../lib/paths.mjs";
 import { MockTripoProvider } from "./mock.mjs";
 import { TripoApiProvider } from "./tripo-api.mjs";
+import { TripoV3Provider } from "./tripo-v3.mjs";
 
 export function loadEnv(file = join(ROOT, ".env")) {
   let text = ""; try { text = readFileSync(file, "utf8"); } catch { return; }
@@ -20,6 +21,8 @@ export function loadPricing() { return JSON.parse(readFileSync(join(ROOT, "tools
 export function createProvider(name = process.env.CHARACTER_PROVIDER || "mock") {
   const pricing = loadPricing();
   if (name === "mock") return new MockTripoProvider({ pricing });
-  if (name === "tripo") return new TripoApiProvider({ apiKey: process.env.TRIPO_API_KEY, pricing });
-  throw new Error(`不明なプロバイダ: ${name}（mock か tripo）`);
+  // tripo = v3（v2 は 2026-11-01 に停止予定。tripo-v2 はそれまでの予備）
+  if (name === "tripo") return new TripoV3Provider({ apiKey: process.env.TRIPO_API_KEY, pricing });
+  if (name === "tripo-v2") return new TripoApiProvider({ apiKey: process.env.TRIPO_API_KEY, pricing });
+  throw new Error(`不明なプロバイダ: ${name}（mock / tripo / tripo-v2）`);
 }

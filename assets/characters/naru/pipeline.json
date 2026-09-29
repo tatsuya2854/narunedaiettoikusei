@@ -1,50 +1,20 @@
 {
   "characterId": "naru",
-  "stage": "registered",
+  "stage": "generated",
   "tasks": {
     "model": {
-      "taskId": "mock-96202760-6541-4ce4-96f4-977e3f45f757",
+      "taskId": "fed2b8aa-9b55-443a-91b7-5a2b6ccceaaa",
       "status": "success",
-      "createdAt": "2026-09-29T05:53:24.320Z",
+      "createdAt": "2026-09-29T06:38:16.632Z",
       "estimate": 30,
-      "finishedAt": "2026-09-29T05:53:24.320Z",
-      "consumedCredits": 0,
+      "finishedAt": "2026-09-29T06:39:54.356Z",
+      "consumedCredits": 30,
       "output": {
-        "model": "mock://model"
-      }
-    },
-    "prerigcheck": {
-      "taskId": "mock-e5938b9d-48cb-4e65-9ce4-a90254aab633",
-      "status": "success",
-      "createdAt": "2026-09-29T05:53:47.034Z",
-      "estimate": 0,
-      "finishedAt": "2026-09-29T05:53:47.035Z",
-      "consumedCredits": 0,
-      "output": {
-        "riggable": true,
-        "rig_type": "biped"
-      }
-    },
-    "rig": {
-      "taskId": "mock-991da571-c41d-4386-8e05-20af07d49a4f",
-      "status": "success",
-      "createdAt": "2026-09-29T05:53:47.036Z",
-      "estimate": 25,
-      "finishedAt": "2026-09-29T05:53:47.036Z",
-      "consumedCredits": 0,
-      "output": {
-        "model": "mock://model"
-      }
-    },
-    "retarget": {
-      "taskId": "mock-c65317b2-977f-46fe-a3fc-c041a1ee205f",
-      "status": "success",
-      "createdAt": "2026-09-29T05:53:47.061Z",
-      "estimate": 40,
-      "finishedAt": "2026-09-29T05:53:47.061Z",
-      "consumedCredits": 0,
-      "output": {
-        "model": "mock://model"
+        "model_url": "https://tripo-data.rg1.data.tripo3d.com/tcli_16ddc206616640eeaa14ef6442a81de9/20260929/fed2b8aa-9b55-443a-91b7-5a2b6ccceaaa/tripo_model_fed2b8aa-9b55-443a-91b7-5a2b6ccceaaa.glb?Policy=eyJTdGF0ZW1lbnQiOlt7IlJlc291cmNlIjoiaHR0cHM6Ly90cmlwby1kYXRhLnJnMS5kYXRhLnRyaXBvM2QuY29tL3RjbGlfMTZkZGMyMDY2MTY2NDBlZWFhMTRlZjY0NDJhODFkZTkvMjAyNjA5MjkvZmVkMmI4YWEtOWI1NS00NDNhLTkxYjctNWEyYjZjY2NlYWFhL3RyaXBvX21vZGVsX2ZlZDJiOGFhLTliNTUtNDQzYS05MWI3LTVhMmI2Y2NjZWFhYS5nbGIiLCJDb25kaXRpb24iOnsiRGF0ZUxlc3NUaGFuIjp7IkFXUzpFcG9jaFRpbWUiOjE3OTA3NTAzOTR9fX1dfQ__&Signature=tSscsTDgjjBkCxc~89to7b5i7bMPpDxZm-5oLYJl-rTtkPizajGcQq9~t1ilzd9a3W60BWMY~8G8poCK8Mr52atdUlyFIutl27rDSd9PbGjrNwoMRsvYuOxbK~b6cQl17Wf46zavfxeILPmfZS6WADOjmOnOEqnclFErHCxRtqdK6UTuSkniGq5Q9slpOc6hpIjgoohm-L8eF7v5QbA6CpOq16ovx0wbdgZ2upEbajhwUdgJ8zZfkCRIVIejeYZlTa28smclZ01qA4bCX~8tjG6U9HfJEYpEVLVjV6D7TZJLB8xSxqKuDHU8tssWgMUkExEgbA-GCZAMeUbHp2ab9g__&Key-Pair-Id=K1676C64NMVM2J",
+        "rendered_image_url": "https://tripo-data.rg1.data.tripo3d.com/tcli_16ddc206616640eeaa14ef6442a81de9/20260929/fed2b8aa-9b55-443a-91b7-5a2b6ccceaaa/legacy_mesh.webp?Policy=eyJTdGF0ZW1lbnQiOlt7IlJlc291cmNlIjoiaHR0cHM6Ly90cmlwby1kYXRhLnJnMS5kYXRhLnRyaXBvM2QuY29tL3RjbGlfMTZkZGMyMDY2MTY2NDBlZWFhMTRlZjY0NDJhODFkZTkvMjAyNjA5MjkvZmVkMmI4YWEtOWI1NS00NDNhLTkxYjctNWEyYjZjY2NlYWFhL2xlZ2FjeV9tZXNoLndlYnAiLCJDb25kaXRpb24iOnsiRGF0ZUxlc3NUaGFuIjp7IkFXUzpFcG9jaFRpbWUiOjE3OTA3NTAzOTR9fX1dfQ__&Signature=J8z6ee0K-~gl27u4GgZt0H-KXNqYOERBBwny52suKxrEi7-Siml88vKFqu99p8ZIC4fjKURdktx9n3Bbg7A3QW0xPu8UtNPVmz8sTDnkscHqcgLtbg30RtMYe9~LVAeO9S1LcYBRkDhPXIWuu2548DwQbwOmJ5xKJg4ZNjuCs-WF-SORRsze-m69mduzhkEMW7bJoqIWsAxBFS3olWcVpVNgfAVsNEa4hYtVn440gNR9tEGv1NgnRPrcEqUUpa~Vt2IkKObmqJNLdFWnDzX-ecq0i8DdlNy3ni5Z9Vf~OxUZE3W-QR4z6UirwYNPW7B2-a~iK3uDQI7m6mYTsXo0yA__&Key-Pair-Id=K1676C64NMVM2J",
+        "model": "https://tripo-data.rg1.data.tripo3d.com/tcli_16ddc206616640eeaa14ef6442a81de9/20260929/fed2b8aa-9b55-443a-91b7-5a2b6ccceaaa/tripo_model_fed2b8aa-9b55-443a-91b7-5a2b6ccceaaa.glb?Policy=eyJTdGF0ZW1lbnQiOlt7IlJlc291cmNlIjoiaHR0cHM6Ly90cmlwby1kYXRhLnJnMS5kYXRhLnRyaXBvM2QuY29tL3RjbGlfMTZkZGMyMDY2MTY2NDBlZWFhMTRlZjY0NDJhODFkZTkvMjAyNjA5MjkvZmVkMmI4YWEtOWI1NS00NDNhLTkxYjctNWEyYjZjY2NlYWFhL3RyaXBvX21vZGVsX2ZlZDJiOGFhLTliNTUtNDQzYS05MWI3LTVhMmI2Y2NjZWFhYS5nbGIiLCJDb25kaXRpb24iOnsiRGF0ZUxlc3NUaGFuIjp7IkFXUzpFcG9jaFRpbWUiOjE3OTA3NTAzOTR9fX1dfQ__&Signature=tSscsTDgjjBkCxc~89to7b5i7bMPpDxZm-5oLYJl-rTtkPizajGcQq9~t1ilzd9a3W60BWMY~8G8poCK8Mr52atdUlyFIutl27rDSd9PbGjrNwoMRsvYuOxbK~b6cQl17Wf46zavfxeILPmfZS6WADOjmOnOEqnclFErHCxRtqdK6UTuSkniGq5Q9slpOc6hpIjgoohm-L8eF7v5QbA6CpOq16ovx0wbdgZ2upEbajhwUdgJ8zZfkCRIVIejeYZlTa28smclZ01qA4bCX~8tjG6U9HfJEYpEVLVjV6D7TZJLB8xSxqKuDHU8tssWgMUkExEgbA-GCZAMeUbHp2ab9g__&Key-Pair-Id=K1676C64NMVM2J",
+        "pbr_model": "https://tripo-data.rg1.data.tripo3d.com/tcli_16ddc206616640eeaa14ef6442a81de9/20260929/fed2b8aa-9b55-443a-91b7-5a2b6ccceaaa/tripo_model_fed2b8aa-9b55-443a-91b7-5a2b6ccceaaa.glb?Policy=eyJTdGF0ZW1lbnQiOlt7IlJlc291cmNlIjoiaHR0cHM6Ly90cmlwby1kYXRhLnJnMS5kYXRhLnRyaXBvM2QuY29tL3RjbGlfMTZkZGMyMDY2MTY2NDBlZWFhMTRlZjY0NDJhODFkZTkvMjAyNjA5MjkvZmVkMmI4YWEtOWI1NS00NDNhLTkxYjctNWEyYjZjY2NlYWFhL3RyaXBvX21vZGVsX2ZlZDJiOGFhLTliNTUtNDQzYS05MWI3LTVhMmI2Y2NjZWFhYS5nbGIiLCJDb25kaXRpb24iOnsiRGF0ZUxlc3NUaGFuIjp7IkFXUzpFcG9jaFRpbWUiOjE3OTA3NTAzOTR9fX1dfQ__&Signature=tSscsTDgjjBkCxc~89to7b5i7bMPpDxZm-5oLYJl-rTtkPizajGcQq9~t1ilzd9a3W60BWMY~8G8poCK8Mr52atdUlyFIutl27rDSd9PbGjrNwoMRsvYuOxbK~b6cQl17Wf46zavfxeILPmfZS6WADOjmOnOEqnclFErHCxRtqdK6UTuSkniGq5Q9slpOc6hpIjgoohm-L8eF7v5QbA6CpOq16ovx0wbdgZ2upEbajhwUdgJ8zZfkCRIVIejeYZlTa28smclZ01qA4bCX~8tjG6U9HfJEYpEVLVjV6D7TZJLB8xSxqKuDHU8tssWgMUkExEgbA-GCZAMeUbHp2ab9g__&Key-Pair-Id=K1676C64NMVM2J",
+        "rendered_image": "https://tripo-data.rg1.data.tripo3d.com/tcli_16ddc206616640eeaa14ef6442a81de9/20260929/fed2b8aa-9b55-443a-91b7-5a2b6ccceaaa/legacy_mesh.webp?Policy=eyJTdGF0ZW1lbnQiOlt7IlJlc291cmNlIjoiaHR0cHM6Ly90cmlwby1kYXRhLnJnMS5kYXRhLnRyaXBvM2QuY29tL3RjbGlfMTZkZGMyMDY2MTY2NDBlZWFhMTRlZjY0NDJhODFkZTkvMjAyNjA5MjkvZmVkMmI4YWEtOWI1NS00NDNhLTkxYjctNWEyYjZjY2NlYWFhL2xlZ2FjeV9tZXNoLndlYnAiLCJDb25kaXRpb24iOnsiRGF0ZUxlc3NUaGFuIjp7IkFXUzpFcG9jaFRpbWUiOjE3OTA3NTAzOTR9fX1dfQ__&Signature=J8z6ee0K-~gl27u4GgZt0H-KXNqYOERBBwny52suKxrEi7-Siml88vKFqu99p8ZIC4fjKURdktx9n3Bbg7A3QW0xPu8UtNPVmz8sTDnkscHqcgLtbg30RtMYe9~LVAeO9S1LcYBRkDhPXIWuu2548DwQbwOmJ5xKJg4ZNjuCs-WF-SORRsze-m69mduzhkEMW7bJoqIWsAxBFS3olWcVpVNgfAVsNEa4hYtVn440gNR9tEGv1NgnRPrcEqUUpa~Vt2IkKObmqJNLdFWnDzX-ecq0i8DdlNy3ni5Z9Vf~OxUZE3W-QR4z6UirwYNPW7B2-a~iK3uDQI7m6mYTsXo0yA__&Key-Pair-Id=K1676C64NMVM2J"
       }
     }
   },
@@ -57,64 +27,27 @@
       "note": "mockでのE2E検証用",
       "reviewer": "sasakitatsuya",
       "decidedAt": "2026-09-29T05:53:46.853Z"
+    },
+    {
+      "taskId": "fed2b8aa-9b55-443a-91b7-5a2b6ccceaaa",
+      "file": "assets/characters/models/naru/fed2b8aa-9b55-443a-91b7-5a2b6ccceaaa.glb",
+      "createdAt": "2026-09-29T06:39:57.328Z",
+      "decision": null,
+      "preview": "assets/characters/models/naru/fed2b8aa-9b55-443a-91b7-5a2b6ccceaaa_preview.glb"
     }
   ],
-  "review": {
-    "taskId": "mock-96202760-6541-4ce4-96f4-977e3f45f757",
-    "decision": "approved",
-    "note": "mockでのE2E検証用",
-    "reviewer": "sasakitatsuya",
-    "at": "2026-09-29T05:53:46.853Z"
-  },
+  "review": null,
   "credits": {
-    "spent": 0,
-    "log": []
+    "spent": 30,
+    "log": [
+      {
+        "slot": "model",
+        "taskId": "fed2b8aa-9b55-443a-91b7-5a2b6ccceaaa",
+        "credits": 30,
+        "at": "2026-09-29T06:39:54.356Z"
+      }
+    ]
   },
-  "updatedAt": "2026-09-29T05:53:47.154Z",
-  "input": "assets/characters/source/naru/input.png",
-  "animatedFile": "assets/characters/animations/naru/mock-c65317b2-977f-46fe-a3fc-c041a1ee205f_animated.glb",
-  "requestedAnimations": {
-    "IDLE": "preset:idle",
-    "WALK": "preset:walk",
-    "JUMP": "preset:jump",
-    "HAPPY": "preset:cheer"
-  },
-  "optimized": {
-    "file": "assets/characters/optimized/naru/naru.glb",
-    "bytes": 88208,
-    "before": {
-      "triangles": 6680,
-      "vertices": 4226,
-      "textures": [],
-      "animations": [
-        "Animation_0",
-        "Animation_1",
-        "Animation_2",
-        "Animation_3"
-      ],
-      "skins": 23,
-      "joints": 368
-    },
-    "after": {
-      "triangles": 6680,
-      "vertices": 3759,
-      "textures": [],
-      "animations": [
-        "idle",
-        "walk",
-        "jump",
-        "happy"
-      ],
-      "skins": 23,
-      "joints": 368
-    },
-    "clipMap": {
-      "IDLE": "idle",
-      "WALK": "walk",
-      "JUMP": "jump",
-      "HAPPY": "happy"
-    },
-    "headBone": "Head",
-    "at": "2026-09-29T05:53:47.152Z"
-  }
+  "updatedAt": "2026-09-29T06:47:13.663Z",
+  "input": "assets/characters/source/naru/input.png"
 }

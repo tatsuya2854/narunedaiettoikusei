@@ -48,6 +48,7 @@ try {
     case "optimize": await pl.optimize({ id }); break;
     case "register": await pl.register({ id }); break;
     case "status": await pl.status({ id }); break;
+    case "preview": await pl.preview({ id }); break;
     case "adopt": await pl.adopt({ id, slot: o.slot, taskId: o.task }); break;
     case "build": await build(); break;
     default: usage();

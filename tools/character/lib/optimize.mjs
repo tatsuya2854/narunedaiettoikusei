@@ -8,6 +8,7 @@ import { ALL_EXTENSIONS } from "@gltf-transform/extensions";
 import { dedup, prune, resample, weld, simplify, textureCompress, quantize, meshopt, getSceneVertexCount, VertexCountMethod } from "@gltf-transform/functions";
 import { MeshoptEncoder, MeshoptDecoder, MeshoptSimplifier } from "meshoptimizer";
 import sharp from "sharp";
+import { removeSideLines } from "./line-cleanup.mjs";
 
 export async function makeIO() {
   await Promise.all([MeshoptEncoder.ready, MeshoptDecoder.ready, MeshoptSimplifier.ready]);
@@ -71,9 +72,24 @@ export function findHeadBone(doc) {
   return names.find((n) => /(^|[^a-z])head$/i.test(n)) || names.find((n) => /head/i.test(n) && !/end|top|nub/i.test(n)) || null;
 }
 
-export async function optimizeGlb({ input, output, wanted, maxTextureSize = 1024, maxTriangles = 15000 }) {
+/** 全体を Y 軸まわりに回して焼き込む。Tripo の出力は +X が正面（export_orientation の既定 "+x"）なので -90 で +Z 正面に揃える */
+export function rotateY(doc, deg) {
+  if (!deg) return;
+  const r = (deg * Math.PI) / 180;
+  const q = [0, Math.sin(r / 2), 0, Math.cos(r / 2)];
+  for (const scene of doc.getRoot().listScenes()) {
+    const wrap = doc.createNode("orientation").setRotation(q);
+    for (const n of scene.listChildren()) { scene.removeChild(n); wrap.addChild(n); }
+    scene.addChild(wrap);
+  }
+}
+
+export async function optimizeGlb({ input, output, wanted, maxTextureSize = 1024, maxTriangles = 15000, rotateYDeg = 0, sideLines = null }) {
   const io = await makeIO();
   const doc = await io.read(input);
+  // 横に回り込んだ輪郭線を消す（回転を焼き込む前＝生出力の向きで判定する）
+  const lines = sideLines ? await removeSideLines(doc, sideLines) : null;
+  rotateY(doc, rotateYDeg);
   const before = stats(doc);
   const clipMap = mapClips(doc, wanted);
   const headBone = findHeadBone(doc);
@@ -93,5 +109,5 @@ export async function optimizeGlb({ input, output, wanted, maxTextureSize = 1024
   );
   const after = stats(doc);
   await io.write(output, doc);
-  return { before, after, clipMap, headBone };
+  return { before, after, clipMap, headBone, lines };
 }

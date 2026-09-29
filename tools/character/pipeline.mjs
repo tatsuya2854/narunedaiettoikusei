@@ -14,7 +14,8 @@ import sharp from "sharp";
 import { ROOT, CHAR_DIR, charPaths } from "./lib/paths.mjs";
 import { loadPipeline, savePipeline, readJson, writeJson } from "./lib/state.mjs";
 import { logFailure } from "./lib/guard.mjs";
-import { optimizeGlb } from "./lib/optimize.mjs";
+import { optimizeGlb, makeIO } from "./lib/optimize.mjs";
+import { removeSideLines } from "./lib/line-cleanup.mjs";
 
 const exists = (p) => access(p).then(() => true, () => false);
 const rel = (p) => relative(ROOT, p);
@@ -27,7 +28,7 @@ export const DEFAULT_GENERATION = {
   multiview: false,
   rigType: "biped", rigVersion: "v1.0-20240301",
   // 状態 → Tripo のプリセット（rig v1.0 biped の一覧から）。1タスク最大5本
-  animations: { IDLE: "preset:idle", WALK: "preset:walk", JUMP: "preset:jump", HAPPY: "preset:cheer" },
+  animations: { IDLE: "preset:biped:idle", WALK: "preset:biped:walk", JUMP: "preset:biped:jump", HAPPY: "preset:biped:cheer" },
 };
 
 export async function init({ id, name, source }) {
@@ -45,7 +46,7 @@ export async function init({ id, name, source }) {
       scale: 1, position: [0, 0, 0], rotation: [0, 0, 0],
       sockets: {},
       generation: DEFAULT_GENERATION,
-      optimize: { maxTextureSize: 1024, maxTriangles: 15000 },
+      optimize: { maxTextureSize: 1024, maxTriangles: 15000, sideLines: { keepFacing: 0.8 } },
       createdAt: now(), updatedAt: now(),
     };
     await writeJson(P.config, cfg);
@@ -170,10 +171,33 @@ export async function generate({ id, guard, provider, newCandidate = false, allo
   if (rec.output.rendered_image && !(await exists(join(P.models, `${rec.taskId}.webp`)))) {
     await provider.downloadOutput(rec.taskId, "rendered_image", join(P.models, `${rec.taskId}.webp`)).catch(() => {});
   }
-  if (!p.candidates.some((c) => c.taskId === rec.taskId)) p.candidates.push({ taskId: rec.taskId, file: rel(dest), createdAt: now(), decision: null });
+  const preview = await makeReviewPreview(cfg, dest, rec.taskId);
+  if (!p.candidates.some((c) => c.taskId === rec.taskId)) p.candidates.push({ taskId: rec.taskId, file: rel(dest), preview, createdAt: now(), decision: null });
   p.stage = "generated";
   await savePipeline(P, p);
   console.log(`\n3Dモデル候補: ${rel(dest)}\n★ ここで止まります。人が確認してください → npm run character:review -- ${id}`);
+}
+
+/** 確認画面用に、ゲームに載るときと同じ「横の線を消した」版を作る（無料・ローカル） */
+async function makeReviewPreview(cfg, file, taskId) {
+  if (taskId.startsWith("mock-") || cfg.optimize?.sideLines === false) return null;
+  const io = await makeIO();
+  const doc = await io.read(file);
+  await removeSideLines(doc, { forward: [1, 0, 0], ...(cfg.optimize?.sideLines || {}) });
+  const out = file.replace(/\.glb$/, "_preview.glb");
+  await io.write(out, doc);
+  return rel(out);
+}
+
+/** 既にある候補の確認用プレビューを作り直す（線の消し方を調整したとき） */
+export async function preview({ id }) {
+  const P = charPaths(id), cfg = await loadCfg(P), p = await loadPipeline(P);
+  for (const c of p.candidates) {
+    if (c.taskId.startsWith("mock-")) continue;
+    c.preview = await makeReviewPreview(cfg, join(ROOT, c.file), c.taskId);
+    console.log(`確認用プレビュー: ${c.preview}`);
+  }
+  await savePipeline(P, p);
 }
 
 export async function decide({ id, taskId, decision, note = "", reviewer = process.env.USER || "human" }) {
@@ -245,7 +269,11 @@ export async function optimize({ id }) {
   if (p.animatedFrom?.model !== p.review?.taskId) throw new Error(`アニメ付きモデルは採用中のモデル（${p.review?.taskId}）から作られたものではありません。rig / animate からやり直してください`);
   const out = join(P.optimized, `${id}.glb`);
   await mkdir(P.optimized, { recursive: true });
-  const r = await optimizeGlb({ input: join(ROOT, p.animatedFile), output: out, wanted: p.requestedAnimations, ...cfg.optimize });
+  // Tripo の出力は +X 正面。mock は +Z 正面で作ってある
+  const isMock = String(p.animatedFrom?.model || "").startsWith("mock-");
+  const rotateYDeg = cfg.optimize.rotateYDeg ?? (isMock ? 0 : -90);
+  const sideLines = cfg.optimize.sideLines === false || isMock ? null : { forward: [1, 0, 0], ...(cfg.optimize.sideLines || {}) };
+  const r = await optimizeGlb({ input: join(ROOT, p.animatedFile), output: out, wanted: p.requestedAnimations, ...cfg.optimize, rotateYDeg, sideLines });
   const { size } = await import("node:fs/promises").then((m) => m.stat(out));
   p.optimized = { from: p.animatedFrom, file: rel(out), bytes: size, before: r.before, after: r.after, clipMap: r.clipMap, headBone: r.headBone, at: now() };
   p.stage = "optimized"; await savePipeline(P, p);
