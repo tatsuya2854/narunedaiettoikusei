@@ -787,6 +787,9 @@ body{
   .shelf .plank{background:#6B4F3E}
 }
 
+/* 3Dキャラ（ためし）：2Dの絵と影を隠して、同じ枠に3Dを描く。アクセはまだ2D用なので隠す */
+.r3d #rigGL, .r3d #shadow, .r3d #acc, .r3d #rigFallback{ visibility:hidden; }
+.rig3d{ pointer-events:none; }
 </style>
 </head>
 <body>
@@ -1403,6 +1406,7 @@ function buildRig(){
   }
   fitRig();
   applyOutfit();
+  mount3D();
 }
 
 /* 骨のワールド行列 → 頂点をスキニング → 描く */
@@ -1678,6 +1682,29 @@ function kickRig(power){
   JS_.hr.v += 16 * power;
   rigKick = Math.min(1.4, rigKick + 0.4*power);
 }
+// --- 3Dキャラ（ためし）。?r=3d で選んだときだけ読み込む。読めない・重いときは2Dに戻る ---
+var R3 = null, actHint = null;
+function r3(fn, a, b){ if(R3 && R3.active){ try{ R3[fn](a, b); }catch(e){} } }
+function toIdle(){ var p = idlePose(); setPose(p); r3("onIdlePose", p); }
+function renderMode(){
+  var m = null;
+  try{ m = new URLSearchParams(location.search).get("r"); }catch(e){}
+  try{ if(m === "3d" || m === "2d") localStorage.setItem("naru_render", m); else m = localStorage.getItem("naru_render"); }catch(e){}
+  return m === "3d" ? "3d" : "2d";
+}
+function back2D(e){
+  R3 = null; document.documentElement.classList.remove("r3d");
+  if(e) console.warn("3Dをやめて2Dで描きます:", e && e.message || e);
+}
+function mount3D(){
+  if(renderMode() !== "3d" || !window.fetch) return;
+  import("./3d/char3d.js").then(function(m){
+    return m.mount({ host: $("body"), reduced: REDUCED, onFail: back2D });
+  }).then(function(api){
+    R3 = api; document.documentElement.classList.add("r3d");
+    r3("onIdlePose", idlePose());
+  }).catch(back2D);
+}
 function setPose(name, quiet){
   if(!POSE[name]) return;
   var changed = poseNow !== name;
@@ -1693,11 +1720,14 @@ function idlePose(){
   return S.mood > 70 ? "cheer" : "thanks";
 }
 
+var rigStill = 0;
 function rigLoop(ts){
   rigRaf = requestAnimationFrame(rigLoop);
   var dt = rigLast ? Math.min(0.045, (ts - rigLast)/1000) : 0.016;
   rigLast = ts;
   if(document.hidden) return;
+  if(R3 && R3.active) return;                       // 3Dが描いている間は2Dの計算をしない
+  if(REDUCED){ if(ts - rigStill < 200) return; rigStill = ts; }   // 動きを減らす設定：静止画として時々描き直すだけ
   rigT += dt;
   rigKick *= Math.pow(0.28, dt);
   tickBreathe();
@@ -1714,7 +1744,7 @@ function rigLoop(ts){
   }
   // 2) ばねで追う（ここで“間”と“行きすぎ”が生まれる）
   var v = {};
-  for(var i=0;i<JKEYS.length;i++){ var k = JKEYS[i]; v[k] = JS_[k].step(a[k], dt); }
+  for(var i=0;i<JKEYS.length;i++){ var k = JKEYS[i]; v[k] = REDUCED ? a[k] : JS_[k].step(a[k], dt); }
   // 3) 表情をなめらかに寄せる
   var ez = 1 - Math.exp(-24*dt);
   flapV += (flap - flapV) * (1 - Math.exp(-14*dt));   // 口パクの出入りも滑らかに
@@ -1729,7 +1759,7 @@ function rigLoop(ts){
   eCur.bs += (eTgt.bs-eCur.bs)*ez;
   EOUT.blushL[3]=EOUT.blushL[4]=EOUT.blushR[3]=EOUT.blushR[4]=eCur.bs;
   // 4) ポニーテールは頭の“速さ”に引っぱられる（動いた方向と逆に流れる）
-  var pa = sPony.step(-(JS_.hr.v*0.052 + JS_.tr.v*0.030 + JS_.ry.v*0.055), dt);
+  var pa = REDUCED ? 0 : sPony.step(-(JS_.hr.v*0.052 + JS_.tr.v*0.030 + JS_.ry.v*0.055), dt);
   pa = Math.max(-22, Math.min(22, pa));
   // 5) 描く
   drawRig(v, v.hr, v.hy, pa, EOUT);
@@ -1755,8 +1785,10 @@ var seqTimer = null, actTimer = null, dancing = false;
 
 var curAct="cheer";
 function playAct(name){
+  var hint = actHint; actHint = null;
   var a = ACT[name]; if(!a || dancing) return;
   curAct = name;
+  r3("onAct", hint || name, a.f.length * a.n * a.ms);
   kickRig(name==="jump"||name==="dance"||name==="run" ? 2.2 : 1.3);
   if(seqTimer){ clearInterval(seqTimer); seqTimer=null; }
   if(actTimer){ clearTimeout(actTimer); actTimer=null; }
@@ -1779,7 +1811,7 @@ function playAct(name){
   actTimer = setTimeout(function(){
     if(a.css) floatEl.classList.remove(a.css);
     actTimer = null; if(CYCACT[name]) stopCycle();
-    setPose(idlePose());
+    toIdle();
   }, total * a.ms);
 }
 function react(kind){
@@ -1966,7 +1998,7 @@ function playEvolve(from, to){
     flash(true); sparkle(14,"star");
     setTimeout(function(){
       showTag("しんか！ "+st.name, true);
-      render(); playAct("win");
+      render(); actHint = "levelup"; playAct("win");
       setTimeout(function(){ say(LINES.evolve[to] || "進化した！"); checkUnlocks(); save(); }, 1300);
     }, 500);
   }, 1500);
@@ -2204,7 +2236,7 @@ function doMeal(kind){
   if(kind==="reward"){ S.puni=clamp(S.puni+6,0,100); S.mood=clamp(S.mood+13,0,100); S.energy=clamp(S.energy+18,0,100); fx("しあわせ〜","#FFC24B"); act="kiss";
     // ごほうびの袋が床に落ちる（うんちの代わり）
     if(spawnMess(1, 0)){ setTimeout(renderMess, 700); } }
-  playAct(act);
+  actHint = "eat"; playAct(act);
   say(pick(LINES.meal[kind]));
   stampUp(); markCare();
   finish(before);
@@ -2413,6 +2445,7 @@ function startDance(songId){
   $("dMute").textContent = S.mute ? "🔇 おと" : "🔊 おと";
   laneEl.querySelectorAll(".note").forEach(function(n){ n.remove(); });
   dancing = true;
+  r3("onDance", true);
   playCycle("dn");        // 曲のあいだ、ダンスの12コマを回し続ける
   if(seqTimer){ clearInterval(seqTimer); seqTimer=null; }
   if(actTimer){ clearTimeout(actTimer); actTimer=null; }
@@ -2498,7 +2531,7 @@ function endDance(aborted){
   floatEl.classList.remove("dancing");
   laneEl.querySelectorAll(".note").forEach(function(n){ n.remove(); });
   danceEl.querySelectorAll(".count,.judge").forEach(function(n){ n.remove(); });
-  setPose(idlePose());
+  toIdle();
   if(aborted || !r){ say("あれ、途中でやめちゃった？\nまた踊ろうね！"); render(); return; }
   var total=r.notes.length, acc=(r.perfect*1+r.good*0.6)/total;
   var rank = acc>=0.95 ? "S" : acc>=0.8 ? "A" : acc>=0.55 ? "B" : "C";
@@ -2676,7 +2709,9 @@ setPose(idlePose());
   probe.onerror = function(){ toast("絵が読み込めない、、、naru.webp を index.html と同じ場所に置いてね"); };
   probe.src = SPRITE_SRC;
 })();
-if(!REDUCED){ rigRaf = requestAnimationFrame(rigLoop); blinkLoop(); }
+// 動きを減らす設定でもループは回す（回さないとキャラが描かれず見えなくなる）。中で静止画扱いにしている
+rigRaf = requestAnimationFrame(rigLoop);
+if(!REDUCED) blinkLoop();
 if(S.stage===0){
   setTimeout(function(){ say(LINES.egg[0]); }, 300);
 }else{
@@ -2705,6 +2740,7 @@ window.__naru={ get:function(){ return S; }, set:function(o){ Object.assign(S,o)
   charts:function(){ var o={}; SONGS.forEach(function(g){ var k=SONG; useSong(g); o[g.id]=makeChart().length; useSong(k); }); return o; }, danceState:function(){ return D; }, closet:sheetCloset, wear:function(o,a){ if(o) S.outfit=o; if(a) S.acc=a; applyOutfit(); render(); save(); },
   arm:function(l,r){ POSE.__t={al:l,ar:r}; setPose("__t"); },
   joint:function(o){ POSE.__t=o; setPose("__t"); }, gl:function(){ return G; }, fit:function(v){ FIT=v; },
+  renderer:function(m){ try{ localStorage.setItem("naru_render", m === "3d" ? "3d" : "2d"); }catch(e){} location.reload(); }, r3:function(){ return R3; },
   dayEvent:todayEvent, season:thisSeason, renderDay:renderDay,
   evFor:eventFor,
   unlockAll:function(){ OUTFITS.concat(ACCS).forEach(function(i){ S.unlocked[i.id]=1; }); save(); }, unlocks:checkUnlocks, outfits:OUTFITS, accs:ACCS, stages:STAGES, cache:spriteCache };
