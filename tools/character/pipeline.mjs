@@ -16,6 +16,7 @@ import { loadPipeline, savePipeline, readJson, writeJson } from "./lib/state.mjs
 import { logFailure } from "./lib/guard.mjs";
 import { optimizeGlb, makeIO, mergeAnimations } from "./lib/optimize.mjs";
 import { removeSideLines } from "./lib/line-cleanup.mjs";
+import { addProceduralClip } from "./lib/procedural-clips.mjs";
 
 const exists = (p) => access(p).then(() => true, () => false);
 const rel = (p) => relative(ROOT, p);
@@ -291,7 +292,16 @@ export async function animate({ id, guard, provider, allowRecreate = false }) {
   const merged = join(P.animations, `${p.tasks.rig.taskId}_merged.glb`);
   const names = Object.fromEntries(states.map((s) => [s, g.animations[s].replace(/^preset:(biped:)?/, "")]));
   await mergeAnimations(states.map((s) => ({ file: join(ROOT, p.retargetFiles[s]), name: names[s] })), merged);
-  p.animatedFile = rel(merged); p.requestedAnimations = g.animations; p.stage = "animated";
+  // Tripo に無い動き（寝る・食べる）は、idle を土台に手元で作って足す（無料）
+  const local = g.localAnimations || {};
+  if (Object.keys(local).length) {
+    const io = await makeIO();
+    const doc = await io.read(merged);
+    for (const name of Object.values(local)) addProceduralClip(doc, name, { forward: [1, 0, 0], up: [0, 1, 0], baseClip: names.IDLE || "idle" });
+    await io.write(merged, doc);
+  }
+  p.animatedFile = rel(merged); p.stage = "animated";
+  p.requestedAnimations = { ...g.animations, ...Object.fromEntries(Object.entries(local).map(([s, n]) => [s, `local:${n}`])) };
   p.animatedFrom = { model: p.review.taskId, rig: p.tasks.rig.taskId, retarget: states.map((s) => p.tasks[`retarget:${s}`].taskId) };
   await savePipeline(P, p);
   console.log(`アニメ付きモデル（${states.length}本をまとめた）: ${rel(merged)}`);

@@ -46,7 +46,7 @@ export function stats(doc) {
 export function mapClips(doc, wanted) {
   const anims = doc.getRoot().listAnimations();
   const states = Object.keys(wanted);
-  const presetName = (p) => p.replace(/^preset:(biped:)?/, "").toLowerCase();
+  const presetName = (p) => p.replace(/^(preset:(biped:)?|local:)/, "").toLowerCase();
   const byName = {};
   for (const s of states) {
     const key = presetName(wanted[s]);
