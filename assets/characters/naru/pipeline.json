@@ -1,0 +1,120 @@
+{
+  "characterId": "naru",
+  "stage": "registered",
+  "tasks": {
+    "model": {
+      "taskId": "mock-96202760-6541-4ce4-96f4-977e3f45f757",
+      "status": "success",
+      "createdAt": "2026-09-29T05:53:24.320Z",
+      "estimate": 30,
+      "finishedAt": "2026-09-29T05:53:24.320Z",
+      "consumedCredits": 0,
+      "output": {
+        "model": "mock://model"
+      }
+    },
+    "prerigcheck": {
+      "taskId": "mock-e5938b9d-48cb-4e65-9ce4-a90254aab633",
+      "status": "success",
+      "createdAt": "2026-09-29T05:53:47.034Z",
+      "estimate": 0,
+      "finishedAt": "2026-09-29T05:53:47.035Z",
+      "consumedCredits": 0,
+      "output": {
+        "riggable": true,
+        "rig_type": "biped"
+      }
+    },
+    "rig": {
+      "taskId": "mock-991da571-c41d-4386-8e05-20af07d49a4f",
+      "status": "success",
+      "createdAt": "2026-09-29T05:53:47.036Z",
+      "estimate": 25,
+      "finishedAt": "2026-09-29T05:53:47.036Z",
+      "consumedCredits": 0,
+      "output": {
+        "model": "mock://model"
+      }
+    },
+    "retarget": {
+      "taskId": "mock-c65317b2-977f-46fe-a3fc-c041a1ee205f",
+      "status": "success",
+      "createdAt": "2026-09-29T05:53:47.061Z",
+      "estimate": 40,
+      "finishedAt": "2026-09-29T05:53:47.061Z",
+      "consumedCredits": 0,
+      "output": {
+        "model": "mock://model"
+      }
+    }
+  },
+  "candidates": [
+    {
+      "taskId": "mock-96202760-6541-4ce4-96f4-977e3f45f757",
+      "file": "assets/characters/models/naru/mock-96202760-6541-4ce4-96f4-977e3f45f757.glb",
+      "createdAt": "2026-09-29T05:53:24.338Z",
+      "decision": "approved",
+      "note": "mockでのE2E検証用",
+      "reviewer": "sasakitatsuya",
+      "decidedAt": "2026-09-29T05:53:46.853Z"
+    }
+  ],
+  "review": {
+    "taskId": "mock-96202760-6541-4ce4-96f4-977e3f45f757",
+    "decision": "approved",
+    "note": "mockでのE2E検証用",
+    "reviewer": "sasakitatsuya",
+    "at": "2026-09-29T05:53:46.853Z"
+  },
+  "credits": {
+    "spent": 0,
+    "log": []
+  },
+  "updatedAt": "2026-09-29T05:53:47.154Z",
+  "input": "assets/characters/source/naru/input.png",
+  "animatedFile": "assets/characters/animations/naru/mock-c65317b2-977f-46fe-a3fc-c041a1ee205f_animated.glb",
+  "requestedAnimations": {
+    "IDLE": "preset:idle",
+    "WALK": "preset:walk",
+    "JUMP": "preset:jump",
+    "HAPPY": "preset:cheer"
+  },
+  "optimized": {
+    "file": "assets/characters/optimized/naru/naru.glb",
+    "bytes": 88208,
+    "before": {
+      "triangles": 6680,
+      "vertices": 4226,
+      "textures": [],
+      "animations": [
+        "Animation_0",
+        "Animation_1",
+        "Animation_2",
+        "Animation_3"
+      ],
+      "skins": 23,
+      "joints": 368
+    },
+    "after": {
+      "triangles": 6680,
+      "vertices": 3759,
+      "textures": [],
+      "animations": [
+        "idle",
+        "walk",
+        "jump",
+        "happy"
+      ],
+      "skins": 23,
+      "joints": 368
+    },
+    "clipMap": {
+      "IDLE": "idle",
+      "WALK": "walk",
+      "JUMP": "jump",
+      "HAPPY": "happy"
+    },
+    "headBone": "Head",
+    "at": "2026-09-29T05:53:47.152Z"
+  }
+}

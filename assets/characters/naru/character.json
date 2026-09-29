@@ -1,0 +1,59 @@
+{
+  "characterId": "naru",
+  "name": "なるねぇ",
+  "version": 1,
+  "sourceImage": "assets/characters/source/naru/front.png",
+  "model": "assets/characters/optimized/naru/naru.glb",
+  "animations": {
+    "IDLE": "idle",
+    "WALK": "walk",
+    "JUMP": "jump",
+    "HAPPY": "happy"
+  },
+  "scale": 1,
+  "position": [
+    0,
+    0,
+    0
+  ],
+  "rotation": [
+    0,
+    0,
+    0
+  ],
+  "sockets": {
+    "head": {
+      "bone": "Head"
+    }
+  },
+  "generation": {
+    "modelVersion": "v3.1-20260211",
+    "texture": true,
+    "pbr": false,
+    "textureQuality": "standard",
+    "faceLimit": 20000,
+    "multiview": false,
+    "rigType": "biped",
+    "rigVersion": "v1.0-20240301",
+    "animations": {
+      "IDLE": "preset:idle",
+      "WALK": "preset:walk",
+      "JUMP": "preset:jump",
+      "HAPPY": "preset:cheer"
+    }
+  },
+  "optimize": {
+    "maxTextureSize": 1024,
+    "maxTriangles": 15000
+  },
+  "createdAt": "2026-09-29T05:53:24.095Z",
+  "updatedAt": "2026-09-29T05:53:47.153Z",
+  "provenance": {
+    "provider": "mock",
+    "modelTask": "mock-96202760-6541-4ce4-96f4-977e3f45f757",
+    "rigTask": "mock-991da571-c41d-4386-8e05-20af07d49a4f",
+    "retargetTask": "mock-c65317b2-977f-46fe-a3fc-c041a1ee205f",
+    "approvedBy": "sasakitatsuya",
+    "approvedAt": "2026-09-29T05:53:46.853Z"
+  }
+}

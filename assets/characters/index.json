@@ -1,0 +1,11 @@
+{
+  "characters": [
+    {
+      "id": "naru",
+      "config": "assets/characters/naru/character.json",
+      "version": 1,
+      "provider": "mock"
+    }
+  ],
+  "default": "naru"
+}
