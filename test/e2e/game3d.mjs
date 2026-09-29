@@ -143,8 +143,9 @@ await check("3D: モデルが読めないときは2Dに戻る", async () => {
   await page.goto(base + "?r=3d");
   await page.waitForFunction(() => window.__naru);
   await page.evaluate(() => window.__naru.set({ stage: 2, hatched: true, careDays: 5 }));
-  await page.waitForTimeout(2500);
-  assert.equal(await page.evaluate(() => document.documentElement.classList.contains("r3d")), false);
+  // 本番は通信があるので、2Dに戻るまで最大15秒待つ
+  await page.waitForFunction(() => !document.documentElement.classList.contains("r3d"), null, { timeout: 15000 });
+  await page.waitForTimeout(1000);
   assert.equal(await page.evaluate(() => window.__naru.r3()), null);
   assert.ok((await inkRatio(page, "#body")) > 0.08, "2Dに戻った後にキャラが描かれていない");
   await ctx.close();
