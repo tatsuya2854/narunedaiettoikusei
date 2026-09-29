@@ -1,0 +1,15 @@
+# 秘密情報（Tripo API キーなど）は絶対にコミットしない
+.env
+.env.*
+!.env.example
+
+node_modules/
+test-results/
+.DS_Store
+
+# パイプラインのログ・モックのタスク記録
+logs/
+
+# Tripo の生出力（大きい・再取得できる）。配信するのは optimized/ だけ
+assets/characters/models/
+assets/characters/animations/

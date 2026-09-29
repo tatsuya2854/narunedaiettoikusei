@@ -1,0 +1,30 @@
+{
+  "name": "narunedaiettoikusei",
+  "private": true,
+  "version": "1.0.0",
+  "description": "なるねぇといっしょ（静的サイト）＋キャラクター3D化パイプライン（開発用ツールのみ。配信にはビルド不要）",
+  "type": "module",
+  "scripts": {
+    "dev": "npx --yes serve . -l 4173",
+    "test": "node --test test/*.test.mjs",
+    "character": "node tools/character/cli.mjs",
+    "character:build": "node tools/character/cli.mjs build",
+    "character:review": "node tools/character/cli.mjs review",
+    "character:export-source": "node tools/character/export-source.mjs",
+    "vendor:three": "node tools/build-three-vendor.mjs",
+    "test:e2e": "node test/e2e/game3d.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "@gltf-transform/core": "^4.5.1",
+    "@gltf-transform/extensions": "^4.5.1",
+    "@gltf-transform/functions": "^4.5.1",
+    "@playwright/test": "^1.63.0",
+    "esbuild": "^0.28.2",
+    "meshoptimizer": "^1.3.0",
+    "sharp": "^0.35.5",
+    "three": "^0.186.1"
+  }
+}
