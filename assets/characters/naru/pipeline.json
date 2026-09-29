@@ -1,6 +1,6 @@
 {
   "characterId": "naru",
-  "stage": "generated",
+  "stage": "optimized",
   "tasks": {
     "model": {
       "taskId": "013cc118-9adf-4f58-99bc-e02a54ae2e1c",
@@ -10,11 +10,91 @@
       "finishedAt": "2026-09-29T06:54:59.083Z",
       "consumedCredits": 30,
       "output": {
-        "model_url": "https://tripo-data.rg1.data.tripo3d.com/tcli_16ddc206616640eeaa14ef6442a81de9/20260929/013cc118-9adf-4f58-99bc-e02a54ae2e1c/tripo_model_013cc118-9adf-4f58-99bc-e02a54ae2e1c.glb?Policy=eyJTdGF0ZW1lbnQiOlt7IlJlc291cmNlIjoiaHR0cHM6Ly90cmlwby1kYXRhLnJnMS5kYXRhLnRyaXBvM2QuY29tL3RjbGlfMTZkZGMyMDY2MTY2NDBlZWFhMTRlZjY0NDJhODFkZTkvMjAyNjA5MjkvMDEzY2MxMTgtOWFkZi00ZjU4LTk5YmMtZTAyYTU0YWUyZTFjL3RyaXBvX21vZGVsXzAxM2NjMTE4LTlhZGYtNGY1OC05OWJjLWUwMmE1NGFlMmUxYy5nbGIiLCJDb25kaXRpb24iOnsiRGF0ZUxlc3NUaGFuIjp7IkFXUzpFcG9jaFRpbWUiOjE3OTA3NTEyOTh9fX1dfQ__&Signature=Md1~qvqoAW1mFlxUddUB0O8LFuyzES0-NoM5C9geqvn7CIqmRew2EA32AhGBF-8Sz7Ey7S67vFWirMxtcwQVg0WYXr9J1qDof0hdGxSlxj77uL-~2VK-TymjjpWn4Sotb~ycTr96eZhjAlz8iSAeMx2~YC83X9WktqWnmuX0rNDTXx4hBye7WWx8cyxjhqjtsG-YTDNja3zmEgpBPYRsdHo3pC4oLSS0Fx4hHdkw1chOU5eQ~AfK3P6s~LhqMT~peTKGG~UVjfJ3hg7KQwk0hIjVzCvFde79dzZQeEizSofo-7sq61YjRcBStm6sUSZYQvvjJJ0lPb7IZP5-ZQzwgg__&Key-Pair-Id=K1676C64NMVM2J",
-        "rendered_image_url": "https://tripo-data.rg1.data.tripo3d.com/tcli_16ddc206616640eeaa14ef6442a81de9/20260929/013cc118-9adf-4f58-99bc-e02a54ae2e1c/legacy_mesh.webp?Policy=eyJTdGF0ZW1lbnQiOlt7IlJlc291cmNlIjoiaHR0cHM6Ly90cmlwby1kYXRhLnJnMS5kYXRhLnRyaXBvM2QuY29tL3RjbGlfMTZkZGMyMDY2MTY2NDBlZWFhMTRlZjY0NDJhODFkZTkvMjAyNjA5MjkvMDEzY2MxMTgtOWFkZi00ZjU4LTk5YmMtZTAyYTU0YWUyZTFjL2xlZ2FjeV9tZXNoLndlYnAiLCJDb25kaXRpb24iOnsiRGF0ZUxlc3NUaGFuIjp7IkFXUzpFcG9jaFRpbWUiOjE3OTA3NTEyOTh9fX1dfQ__&Signature=rf5zK9aW2K7O2ix-oLVsUeLEnk76bjS0XRCq~Im065P0VPPsi7nKEpm5n~xNaonjY~D2ZvnWK09ZhsF2g55zzn8NAs4TvEVmavpGWJOisqLxphgma2jBArMFdFDMrV9FRUpo9BGAvepVuK7N-88qDVGdoViM5X7gIv5j6kFzjke9mdIfVXfl6g48YoWgPmy3mQC1Reh9GzsArlfjm4VhM82mAW2qjX0CKfCtsIeCDpshOoSOZrLLA6nqpL4of5hPufJsW~9QE9z~fwdiZJJzlrKrbN-dU3egVR37pXoSrbPRGzfJzNP1ZikF7NvJ~jCmFfpg~E9VOtOsb2Xb7RruLA__&Key-Pair-Id=K1676C64NMVM2J",
-        "model": "https://tripo-data.rg1.data.tripo3d.com/tcli_16ddc206616640eeaa14ef6442a81de9/20260929/013cc118-9adf-4f58-99bc-e02a54ae2e1c/tripo_model_013cc118-9adf-4f58-99bc-e02a54ae2e1c.glb?Policy=eyJTdGF0ZW1lbnQiOlt7IlJlc291cmNlIjoiaHR0cHM6Ly90cmlwby1kYXRhLnJnMS5kYXRhLnRyaXBvM2QuY29tL3RjbGlfMTZkZGMyMDY2MTY2NDBlZWFhMTRlZjY0NDJhODFkZTkvMjAyNjA5MjkvMDEzY2MxMTgtOWFkZi00ZjU4LTk5YmMtZTAyYTU0YWUyZTFjL3RyaXBvX21vZGVsXzAxM2NjMTE4LTlhZGYtNGY1OC05OWJjLWUwMmE1NGFlMmUxYy5nbGIiLCJDb25kaXRpb24iOnsiRGF0ZUxlc3NUaGFuIjp7IkFXUzpFcG9jaFRpbWUiOjE3OTA3NTEyOTh9fX1dfQ__&Signature=Md1~qvqoAW1mFlxUddUB0O8LFuyzES0-NoM5C9geqvn7CIqmRew2EA32AhGBF-8Sz7Ey7S67vFWirMxtcwQVg0WYXr9J1qDof0hdGxSlxj77uL-~2VK-TymjjpWn4Sotb~ycTr96eZhjAlz8iSAeMx2~YC83X9WktqWnmuX0rNDTXx4hBye7WWx8cyxjhqjtsG-YTDNja3zmEgpBPYRsdHo3pC4oLSS0Fx4hHdkw1chOU5eQ~AfK3P6s~LhqMT~peTKGG~UVjfJ3hg7KQwk0hIjVzCvFde79dzZQeEizSofo-7sq61YjRcBStm6sUSZYQvvjJJ0lPb7IZP5-ZQzwgg__&Key-Pair-Id=K1676C64NMVM2J",
-        "pbr_model": "https://tripo-data.rg1.data.tripo3d.com/tcli_16ddc206616640eeaa14ef6442a81de9/20260929/013cc118-9adf-4f58-99bc-e02a54ae2e1c/tripo_model_013cc118-9adf-4f58-99bc-e02a54ae2e1c.glb?Policy=eyJTdGF0ZW1lbnQiOlt7IlJlc291cmNlIjoiaHR0cHM6Ly90cmlwby1kYXRhLnJnMS5kYXRhLnRyaXBvM2QuY29tL3RjbGlfMTZkZGMyMDY2MTY2NDBlZWFhMTRlZjY0NDJhODFkZTkvMjAyNjA5MjkvMDEzY2MxMTgtOWFkZi00ZjU4LTk5YmMtZTAyYTU0YWUyZTFjL3RyaXBvX21vZGVsXzAxM2NjMTE4LTlhZGYtNGY1OC05OWJjLWUwMmE1NGFlMmUxYy5nbGIiLCJDb25kaXRpb24iOnsiRGF0ZUxlc3NUaGFuIjp7IkFXUzpFcG9jaFRpbWUiOjE3OTA3NTEyOTh9fX1dfQ__&Signature=Md1~qvqoAW1mFlxUddUB0O8LFuyzES0-NoM5C9geqvn7CIqmRew2EA32AhGBF-8Sz7Ey7S67vFWirMxtcwQVg0WYXr9J1qDof0hdGxSlxj77uL-~2VK-TymjjpWn4Sotb~ycTr96eZhjAlz8iSAeMx2~YC83X9WktqWnmuX0rNDTXx4hBye7WWx8cyxjhqjtsG-YTDNja3zmEgpBPYRsdHo3pC4oLSS0Fx4hHdkw1chOU5eQ~AfK3P6s~LhqMT~peTKGG~UVjfJ3hg7KQwk0hIjVzCvFde79dzZQeEizSofo-7sq61YjRcBStm6sUSZYQvvjJJ0lPb7IZP5-ZQzwgg__&Key-Pair-Id=K1676C64NMVM2J",
-        "rendered_image": "https://tripo-data.rg1.data.tripo3d.com/tcli_16ddc206616640eeaa14ef6442a81de9/20260929/013cc118-9adf-4f58-99bc-e02a54ae2e1c/legacy_mesh.webp?Policy=eyJTdGF0ZW1lbnQiOlt7IlJlc291cmNlIjoiaHR0cHM6Ly90cmlwby1kYXRhLnJnMS5kYXRhLnRyaXBvM2QuY29tL3RjbGlfMTZkZGMyMDY2MTY2NDBlZWFhMTRlZjY0NDJhODFkZTkvMjAyNjA5MjkvMDEzY2MxMTgtOWFkZi00ZjU4LTk5YmMtZTAyYTU0YWUyZTFjL2xlZ2FjeV9tZXNoLndlYnAiLCJDb25kaXRpb24iOnsiRGF0ZUxlc3NUaGFuIjp7IkFXUzpFcG9jaFRpbWUiOjE3OTA3NTEyOTh9fX1dfQ__&Signature=rf5zK9aW2K7O2ix-oLVsUeLEnk76bjS0XRCq~Im065P0VPPsi7nKEpm5n~xNaonjY~D2ZvnWK09ZhsF2g55zzn8NAs4TvEVmavpGWJOisqLxphgma2jBArMFdFDMrV9FRUpo9BGAvepVuK7N-88qDVGdoViM5X7gIv5j6kFzjke9mdIfVXfl6g48YoWgPmy3mQC1Reh9GzsArlfjm4VhM82mAW2qjX0CKfCtsIeCDpshOoSOZrLLA6nqpL4of5hPufJsW~9QE9z~fwdiZJJzlrKrbN-dU3egVR37pXoSrbPRGzfJzNP1ZikF7NvJ~jCmFfpg~E9VOtOsb2Xb7RruLA__&Key-Pair-Id=K1676C64NMVM2J"
+        "model_url": "(url)",
+        "rendered_image_url": "(url)",
+        "model": "(url)",
+        "pbr_model": "(url)",
+        "rendered_image": "(url)"
+      }
+    },
+    "prerigcheck": {
+      "taskId": "a7aa96fd-edd9-486e-a08f-67c2260e976e",
+      "status": "success",
+      "createdAt": "2026-09-29T06:57:33.379Z",
+      "estimate": 0,
+      "finishedAt": "2026-09-29T06:57:39.678Z",
+      "consumedCredits": 0,
+      "output": {
+        "riggable": true,
+        "rig_type": "biped"
+      }
+    },
+    "rig": {
+      "taskId": "5617d936-e18d-4932-bb34-10190d371ee8",
+      "status": "success",
+      "createdAt": "2026-09-29T06:57:40.414Z",
+      "estimate": 25,
+      "finishedAt": "2026-09-29T06:57:45.569Z",
+      "consumedCredits": 25,
+      "output": {
+        "model_url": "(url)",
+        "rendered_image_url": "(url)",
+        "model": "(url)",
+        "pbr_model": "(url)",
+        "rendered_image": "(url)"
+      }
+    },
+    "retarget:HAPPY": {
+      "taskId": "35932e39-d0e8-497c-bbc8-5d3a995d5ec0",
+      "status": "success",
+      "createdAt": "2026-09-29T06:57:49.374Z",
+      "estimate": 40,
+      "finishedAt": "2026-09-29T06:57:55.330Z",
+      "consumedCredits": 40,
+      "output": {
+        "model_url": "(url)",
+        "model": "(url)",
+        "pbr_model": "(url)"
+      },
+      "note": "まとめて頼んだタスク。中身は最後の1本だけ"
+    },
+    "retarget:IDLE": {
+      "taskId": "11349cb0-4b9d-4337-a8cb-79152d058efd",
+      "status": "success",
+      "createdAt": "2026-09-29T07:00:31.474Z",
+      "estimate": 10,
+      "finishedAt": "2026-09-29T07:00:37.736Z",
+      "consumedCredits": 10,
+      "output": {
+        "model_url": "(url)",
+        "model": "(url)",
+        "pbr_model": "(url)"
+      }
+    },
+    "retarget:WALK": {
+      "taskId": "acf2b097-7ad3-4aee-9679-6e321338c468",
+      "status": "success",
+      "createdAt": "2026-09-29T07:00:40.915Z",
+      "estimate": 10,
+      "finishedAt": "2026-09-29T07:00:47.283Z",
+      "consumedCredits": 10,
+      "output": {
+        "model_url": "(url)",
+        "model": "(url)",
+        "pbr_model": "(url)"
+      }
+    },
+    "retarget:JUMP": {
+      "taskId": "5744b488-3257-4115-8d3d-4b92883a246c",
+      "status": "success",
+      "createdAt": "2026-09-29T07:00:50.825Z",
+      "estimate": 10,
+      "finishedAt": "2026-09-29T07:00:56.153Z",
+      "consumedCredits": 10,
+      "output": {
+        "model_url": "(url)",
+        "model": "(url)",
+        "pbr_model": "(url)"
       }
     }
   },
@@ -32,20 +112,32 @@
       "taskId": "fed2b8aa-9b55-443a-91b7-5a2b6ccceaaa",
       "file": "assets/characters/models/naru/fed2b8aa-9b55-443a-91b7-5a2b6ccceaaa.glb",
       "createdAt": "2026-09-29T06:39:57.328Z",
-      "decision": null,
-      "preview": "assets/characters/models/naru/fed2b8aa-9b55-443a-91b7-5a2b6ccceaaa_preview.glb"
+      "decision": "rejected",
+      "preview": "assets/characters/models/naru/fed2b8aa-9b55-443a-91b7-5a2b6ccceaaa_preview.glb",
+      "note": "側面に輪郭線が回り込む。線なし版の入力で作り直した",
+      "reviewer": "sasakitatsuya",
+      "decidedAt": "2026-09-29T06:57:29.976Z"
     },
     {
       "taskId": "013cc118-9adf-4f58-99bc-e02a54ae2e1c",
       "file": "assets/characters/models/naru/013cc118-9adf-4f58-99bc-e02a54ae2e1c.glb",
       "preview": "assets/characters/models/naru/013cc118-9adf-4f58-99bc-e02a54ae2e1c_preview.glb",
       "createdAt": "2026-09-29T06:55:03.625Z",
-      "decision": null
+      "decision": "approved",
+      "note": "ユーザーがチャットで『進めて』と承認（線なし入力・横のスジなし）",
+      "reviewer": "sasakitatsuya",
+      "decidedAt": "2026-09-29T06:57:30.161Z"
     }
   ],
-  "review": null,
+  "review": {
+    "taskId": "013cc118-9adf-4f58-99bc-e02a54ae2e1c",
+    "decision": "approved",
+    "note": "ユーザーがチャットで『進めて』と承認（線なし入力・横のスジなし）",
+    "reviewer": "sasakitatsuya",
+    "at": "2026-09-29T06:57:30.161Z"
+  },
   "credits": {
-    "spent": 60,
+    "spent": 155,
     "log": [
       {
         "slot": "model",
@@ -58,9 +150,128 @@
         "taskId": "013cc118-9adf-4f58-99bc-e02a54ae2e1c",
         "credits": 30,
         "at": "2026-09-29T06:54:59.083Z"
+      },
+      {
+        "slot": "rig",
+        "taskId": "5617d936-e18d-4932-bb34-10190d371ee8",
+        "credits": 25,
+        "at": "2026-09-29T06:57:45.569Z"
+      },
+      {
+        "slot": "retarget",
+        "taskId": "35932e39-d0e8-497c-bbc8-5d3a995d5ec0",
+        "credits": 40,
+        "at": "2026-09-29T06:57:55.330Z"
+      },
+      {
+        "slot": "retarget:IDLE",
+        "taskId": "11349cb0-4b9d-4337-a8cb-79152d058efd",
+        "credits": 10,
+        "at": "2026-09-29T07:00:37.736Z"
+      },
+      {
+        "slot": "retarget:WALK",
+        "taskId": "acf2b097-7ad3-4aee-9679-6e321338c468",
+        "credits": 10,
+        "at": "2026-09-29T07:00:47.283Z"
+      },
+      {
+        "slot": "retarget:JUMP",
+        "taskId": "5744b488-3257-4115-8d3d-4b92883a246c",
+        "credits": 10,
+        "at": "2026-09-29T07:00:56.153Z"
       }
     ]
   },
-  "updatedAt": "2026-09-29T06:55:03.625Z",
-  "input": "assets/characters/source/naru/input.png"
+  "updatedAt": "2026-09-29T07:08:44.539Z",
+  "input": "assets/characters/source/naru/input.png",
+  "animatedFile": "assets/characters/animations/naru/5617d936-e18d-4932-bb34-10190d371ee8_merged.glb",
+  "requestedAnimations": {
+    "IDLE": "preset:biped:idle",
+    "WALK": "preset:biped:walk",
+    "JUMP": "preset:biped:jump",
+    "HAPPY": "preset:biped:cheer"
+  },
+  "animatedFrom": {
+    "model": "013cc118-9adf-4f58-99bc-e02a54ae2e1c",
+    "rig": "5617d936-e18d-4932-bb34-10190d371ee8",
+    "retarget": [
+      "11349cb0-4b9d-4337-a8cb-79152d058efd",
+      "acf2b097-7ad3-4aee-9679-6e321338c468",
+      "5744b488-3257-4115-8d3d-4b92883a246c",
+      "35932e39-d0e8-497c-bbc8-5d3a995d5ec0"
+    ]
+  },
+  "retargetFiles": {
+    "HAPPY": "assets/characters/animations/naru/35932e39-d0e8-497c-bbc8-5d3a995d5ec0_animated.glb",
+    "IDLE": "assets/characters/animations/naru/11349cb0-4b9d-4337-a8cb-79152d058efd_idle.glb",
+    "WALK": "assets/characters/animations/naru/acf2b097-7ad3-4aee-9679-6e321338c468_walk.glb",
+    "JUMP": "assets/characters/animations/naru/5744b488-3257-4115-8d3d-4b92883a246c_jump.glb"
+  },
+  "optimized": {
+    "from": {
+      "model": "013cc118-9adf-4f58-99bc-e02a54ae2e1c",
+      "rig": "5617d936-e18d-4932-bb34-10190d371ee8",
+      "retarget": [
+        "11349cb0-4b9d-4337-a8cb-79152d058efd",
+        "acf2b097-7ad3-4aee-9679-6e321338c468",
+        "5744b488-3257-4115-8d3d-4b92883a246c",
+        "35932e39-d0e8-497c-bbc8-5d3a995d5ec0"
+      ]
+    },
+    "file": "assets/characters/optimized/naru/naru.glb",
+    "bytes": 542468,
+    "before": {
+      "triangles": 18906,
+      "vertices": 11112,
+      "textures": [
+        {
+          "size": [
+            2048,
+            2048
+          ],
+          "mime": "image/jpeg",
+          "bytes": 346784
+        }
+      ],
+      "animations": [
+        "idle",
+        "walk",
+        "jump",
+        "cheer"
+      ],
+      "skins": 1,
+      "joints": 41
+    },
+    "after": {
+      "triangles": 15000,
+      "vertices": 9117,
+      "textures": [
+        {
+          "size": [
+            1024,
+            1024
+          ],
+          "mime": "image/webp",
+          "bytes": 43252
+        }
+      ],
+      "animations": [
+        "idle",
+        "walk",
+        "jump",
+        "happy"
+      ],
+      "skins": 1,
+      "joints": 41
+    },
+    "clipMap": {
+      "IDLE": "idle",
+      "WALK": "walk",
+      "JUMP": "jump",
+      "HAPPY": "happy"
+    },
+    "headBone": "Head",
+    "at": "2026-09-29T07:07:24.726Z"
+  }
 }

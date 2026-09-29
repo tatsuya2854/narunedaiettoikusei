@@ -7,14 +7,33 @@
 | 段階 | 状態 |
 |---|---|
 | 調査（Tripo 公式・既存コード） | 済み |
-| パイプライン（CLI）・クレジット保護・Human Checkpoint | 済み。**Mock で一通り動作確認済み** |
-| ゲーム統合（Animation State Machine・2Dへの自動フォールバック） | 済み。`?r=3d` のときだけ有効 |
-| **本物の Tripo で1体生成** | **未実施**（API キー未設定・有料のため人の判断待ち） |
-| 本物モデルの Approve・リグ・4モーション | 未実施（上の後） |
-| 本物モデルでの iPhone 実機計測 | 未実施 |
+| パイプライン（CLI）・クレジット保護・Human Checkpoint | 済み（Mock と本物の両方で通した） |
+| **本物の Tripo で生成** | 済み。1回目は横に輪郭線が回り込んだので Reject、線なしの絵から作り直して **Approve**（2026-09-29、ユーザー承認） |
+| リグ・4モーション（idle / walk / jump / cheer） | 済み |
+| 最適化・ゲーム登録 | 済み（530KB・1.5万三角形・テクスチャ1024 WebP） |
+| ゲーム内の3D表示 | `?r=3d` のときだけ。既定は2Dのまま |
+| iPhone 実機での計測 | **未実施**（Chromium の iPhone 画面エミュレーションでのみ確認） |
 
-いま `assets/characters/optimized/naru/naru.glb` に入っているのは **Mock（手続き的に作った仮モデル）** で、なるねぇの見た目の再現を目的にしていない。
-`character.json` の `provenance.provider` が `mock` のあいだは、ゲームの既定は2Dのまま（3Dは `?r=3d` を付けたときだけ）。
+### 使ったクレジット（無料ウォレット 600 のうち）
+
+| 処理 | クレジット |
+|---|---|
+| 生成 1回目（輪郭線あり・不採用） | 30 |
+| 生成 2回目（線なし入力・採用） | 30 |
+| リグ事前チェック / リグ | 0 / 25 |
+| retarget まとめて4本（**中身は最後の1本だけだった**） | 40 |
+| retarget idle / walk / jump を1本ずつ | 30 |
+| **合計** | **155**（残り 445） |
+
+### 実際にやってわかったこと
+
+- **Tripo API v2 は 2026-11-01 に停止**（コンソールの告知）。v3（`openapi.tripo3d.ai/v3`）に移行済み。`--provider tripo` は v3
+- **出力は +X が正面**（`export_orientation` 既定）。最適化で -90° 回して +Z 正面に焼き込む
+- **retarget に animations を複数入れても、GLB には最後の1本しか入らない**（4本ぶん課金される）。1タスク1本で頼み、`mergeAnimations` で1ファイルにまとめる
+- **元絵の黒い輪郭線が、横や腕の面に縦のスジとして焼き込まれる**。対策は2段：
+  1. 3D化の入力を「輪郭線だけ消した絵」にする（ChatGPT＝Codex の image_gen で作成。`generation.inputImage`。デザインの正は `front.png` のまま）
+  2. 残った線は `line-cleanup.mjs` が正面を向いていない面の黒だけ埋める（無料・毎回自動）
+- cheer は12秒ある。ゲームの演出に合わせて最長3〜4秒で切り上げる
 
 ## 元絵（Source of Truth）
 
@@ -42,7 +61,7 @@
 | image_to_model（v3.1・テクスチャ standard） | 30 |
 | animate_prerigcheck | 0 |
 | animate_rig（biped v1.0） | 25 |
-| animate_retarget（idle / walk / jump / cheer をまとめて1タスク） | 40 |
+| animate_retarget（idle / walk / jump / cheer を1本ずつ4タスク） | 40 |
 | **合計** | **95（約 $0.95）** |
 | （任意）4視点画像を先に作る | +10 |
 

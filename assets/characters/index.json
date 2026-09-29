@@ -3,8 +3,8 @@
     {
       "id": "naru",
       "config": "assets/characters/naru/character.json",
-      "version": 1,
-      "provider": "mock"
+      "version": 2,
+      "provider": "tripo"
     }
   ],
   "default": "naru"

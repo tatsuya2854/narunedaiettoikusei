@@ -1,7 +1,7 @@
 {
   "characterId": "naru",
   "name": "なるねぇ",
-  "version": 1,
+  "version": 2,
   "sourceImage": "assets/characters/source/naru/front.png",
   "model": "assets/characters/optimized/naru/naru.glb",
   "animations": {
@@ -52,13 +52,12 @@
     }
   },
   "createdAt": "2026-09-29T05:53:24.095Z",
-  "updatedAt": "2026-09-29T05:53:47.153Z",
+  "updatedAt": "2026-09-29T07:01:24.876Z",
   "provenance": {
-    "provider": "mock",
-    "modelTask": "mock-96202760-6541-4ce4-96f4-977e3f45f757",
-    "rigTask": "mock-991da571-c41d-4386-8e05-20af07d49a4f",
-    "retargetTask": "mock-c65317b2-977f-46fe-a3fc-c041a1ee205f",
+    "provider": "tripo",
+    "modelTask": "013cc118-9adf-4f58-99bc-e02a54ae2e1c",
+    "rigTask": "5617d936-e18d-4932-bb34-10190d371ee8",
     "approvedBy": "sasakitatsuya",
-    "approvedAt": "2026-09-29T05:53:46.853Z"
+    "approvedAt": "2026-09-29T06:57:30.161Z"
   }
 }
